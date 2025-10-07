@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <title>Yandex Music Rater</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <div class="container">
+      <h1>Текущий трек</h1>
+      <div class="track-info">
+        <p>
+          <strong>Название:</strong> <span id="track-title">Загружаю...</span>
+        </p>
+        <p><strong>Артист:</strong> <span id="track-artist"></span></p>
+        <p><strong>Альбом:</strong> <span id="track-album"></span></p>
+      </div>
+      <div class="rating">
+        <h2>Оцените трек</h2>
+        <div class="stars">
+          <span class="star" data-rating="1">★</span>
+          <span class="star" data-rating="2">★</span>
+          <span class="star" data-rating="3">★</span>
+          <span class="star" data-rating="4">★</span>
+          <span class="star" data-rating="5">★</span>
+        </div>
+      </div>
+    </div>
+    <script src="renderer.js"></script>
+  </body>
+</html>
