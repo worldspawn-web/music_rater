@@ -1,0 +1,25 @@
+{
+  "name": "yandex_music_rating",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/worldspawn-web/yandex_music_rating.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/worldspawn-web/yandex_music_rating/issues"
+  },
+  "homepage": "https://github.com/worldspawn-web/yandex_music_rating#readme",
+  "description": "",
+  "dependencies": {
+    "@types/node": "^24.7.0",
+    "axios": "^1.12.2",
+    "nowplaying": "^3.3.3"
+  }
+}

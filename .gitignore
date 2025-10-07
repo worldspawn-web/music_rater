@@ -1,0 +1,18 @@
+# Environment File
+.env
+.venv
+venv
+
+# IDEA
+.idea
+.DS_Store
+.vscode/
+
+# Cache
+__pycache__
+temp
+logs/
+*.png
+
+# Packages
+/node_modules
