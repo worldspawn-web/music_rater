@@ -40,7 +40,7 @@ ipcMain.handle('saveRating', async (event, { trackInfo, rating }) => {
     title: trackInfo.title,
     artist: trackInfo.artist,
     album: trackInfo.album,
-    rating: rating,
+    rating: parseInt(rating),
     timestamp: new Date().toISOString(),
   };
 
@@ -51,6 +51,65 @@ ipcMain.handle('saveRating', async (event, { trackInfo, rating }) => {
   ratings.push(data);
   fs.writeFileSync('ratings.json', JSON.stringify(ratings, null, 2));
   return { success: true };
+});
+
+ipcMain.handle('getTrackRatings', async () => {
+  if (!fs.existsSync('ratings.json')) {
+    return [];
+  }
+
+  const ratings = JSON.parse(fs.readFileSync('ratings.json'));
+  const trackRatings = {};
+
+  ratings.forEach((rating) => {
+    const key = `${rating.title}-${rating.artist}`;
+    if (!trackRatings[key]) {
+      trackRatings[key] = {
+        title: rating.title,
+        artist: rating.artist,
+        ratings: [],
+      };
+    }
+    trackRatings[key].ratings.push(rating.rating);
+  });
+
+  return Object.values(trackRatings)
+    .map((track) => ({
+      title: track.title,
+      artist: track.artist,
+      avgRating:
+        track.ratings.reduce((sum, r) => sum + r, 0) / track.ratings.length,
+      count: track.ratings.length,
+    }))
+    .sort((a, b) => b.avgRating - a.avgRating || b.count - a.count);
+});
+
+ipcMain.handle('getArtistRatings', async () => {
+  if (!fs.existsSync('ratings.json')) {
+    return [];
+  }
+
+  const ratings = JSON.parse(fs.readFileSync('ratings.json'));
+  const artistRatings = {};
+
+  ratings.forEach((rating) => {
+    if (!artistRatings[rating.artist]) {
+      artistRatings[rating.artist] = {
+        artist: rating.artist,
+        ratings: [],
+      };
+    }
+    artistRatings[rating.artist].ratings.push(rating.rating);
+  });
+
+  return Object.values(artistRatings)
+    .map((artist) => ({
+      artist: artist.artist,
+      avgRating:
+        artist.ratings.reduce((sum, r) => sum + r, 0) / artist.ratings.length,
+      count: artist.ratings.length,
+    }))
+    .sort((a, b) => b.avgRating - a.avgRating || b.count - a.count);
 });
 
 app.whenReady().then(createWindow);

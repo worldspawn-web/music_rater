@@ -6,26 +6,82 @@
     <link rel="stylesheet" href="style.css" />
   </head>
   <body>
-    <div class="container">
-      <h1>Текущий трек</h1>
-      <div class="track-info">
-        <p>
-          <strong>Название:</strong> <span id="track-title">Загружаю...</span>
-        </p>
-        <p><strong>Артист:</strong> <span id="track-artist"></span></p>
-        <p><strong>Альбом:</strong> <span id="track-album"></span></p>
-      </div>
-      <div class="rating">
-        <h2>Оцените трек</h2>
-        <div class="stars">
-          <span class="star" data-rating="1">★</span>
-          <span class="star" data-rating="2">★</span>
-          <span class="star" data-rating="3">★</span>
-          <span class="star" data-rating="4">★</span>
-          <span class="star" data-rating="5">★</span>
+    <div class="tabs">
+      <button class="tab-button active" data-tab="current-track">
+        Текущий трек
+      </button>
+      <button class="tab-button" data-tab="track-ratings">
+        Рейтинги треков
+      </button>
+      <button class="tab-button" data-tab="artist-ratings">
+        Рейтинги исполнителей
+      </button>
+    </div>
+
+    <div class="tab-content active" id="current-track">
+      <div class="container">
+        <div class="cover-container">
+          <img id="track-cover" src="" alt="Обложка альбома" class="cover" />
+        </div>
+        <h1>Текущий трек</h1>
+        <div class="track-info">
+          <p>
+            <strong>Название:</strong> <span id="track-title">Загружаю...</span>
+          </p>
+          <p><strong>Артист:</strong> <span id="track-artist"></span></p>
+          <p><strong>Альбом:</strong> <span id="track-album"></span></p>
+        </div>
+        <div class="rating">
+          <h2>Оцените трек (1-10)</h2>
+          <div class="rating-buttons">
+            <button class="rating-button" data-rating="1">1</button>
+            <button class="rating-button" data-rating="2">2</button>
+            <button class="rating-button" data-rating="3">3</button>
+            <button class="rating-button" data-rating="4">4</button>
+            <button class="rating-button" data-rating="5">5</button>
+            <button class="rating-button" data-rating="6">6</button>
+            <button class="rating-button" data-rating="7">7</button>
+            <button class="rating-button" data-rating="8">8</button>
+            <button class="rating-button" data-rating="9">9</button>
+            <button class="rating-button" data-rating="10">10</button>
+          </div>
         </div>
       </div>
     </div>
+
+    <div class="tab-content" id="track-ratings">
+      <div class="container">
+        <h1>Рейтинги треков</h1>
+        <table id="track-ratings-table">
+          <thead>
+            <tr>
+              <th>Название</th>
+              <th>Артист</th>
+              <th>Рейтинг</th>
+              <th>Количество оценок</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="tab-content" id="artist-ratings">
+      <div class="container">
+        <h1>Рейтинги исполнителей</h1>
+        <table id="artist-ratings-table">
+          <thead>
+            <tr>
+              <th>Исполнитель</th>
+              <th>Количество песен</th>
+              <th>Средний рейтинг</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+
     <script src="renderer.js"></script>
   </body>
 </html>
