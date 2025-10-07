@@ -31,9 +31,11 @@ async function fetchCurrentTrack() {
     document.getElementById('track-artist').textContent = trackInfo.artist;
     document.getElementById('track-album').textContent = trackInfo.album;
 
-    // Загрузка обложки альбома (пока заглушка)
-    document.getElementById('track-cover').src =
-      'https://via.placeholder.com/200';
+    // Загрузка обложки альбома
+    const coverPath = await ipcRenderer.invoke('getCover', trackInfo.album);
+    if (coverPath) {
+      document.getElementById('track-cover').src = `file://${coverPath}`;
+    }
   } catch (error) {
     console.error(error);
   }
@@ -60,6 +62,12 @@ document.querySelectorAll('.rating-button').forEach((button) => {
       });
       if (result.success) {
         alert(`Вы поставили оценку: ${rating}`);
+        document.querySelectorAll('.rating-button').forEach((btn) => {
+          btn.style.backgroundColor = '';
+        });
+        button.style.backgroundColor = '#4CAF50';
+      } else {
+        alert(result.message);
       }
     } catch (error) {
       console.error('Ошибка при сохранении рейтинга:', error);
