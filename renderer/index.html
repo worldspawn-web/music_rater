@@ -16,13 +16,13 @@
       <button class="tab-button" data-tab="artist-ratings">
         Рейтинги исполнителей
       </button>
+      <button class="tab-button" data-tab="genre-ratings">
+        Рейтинги жанров
+      </button>
     </div>
 
     <div class="tab-content active" id="current-track">
       <div class="container">
-        <div class="cover-container">
-          <img id="track-cover" src="" alt="Обложка альбома" class="cover" />
-        </div>
         <h1>Текущий трек</h1>
         <div class="track-info">
           <p>
@@ -30,6 +30,25 @@
           </p>
           <p><strong>Артист:</strong> <span id="track-artist"></span></p>
           <p><strong>Альбом:</strong> <span id="track-album"></span></p>
+        </div>
+        <div class="genre-section">
+          <label for="genre-select">Жанр:</label>
+          <select id="genre-select"></select>
+          <button id="add-genre-button">Добавить жанр</button>
+        </div>
+        <div class="vibe-section">
+          <p><strong>Вайб:</strong></p>
+          <div class="vibe-buttons">
+            <button class="vibe-button" data-vibe="Спокойное">Спокойное</button>
+            <button class="vibe-button" data-vibe="Грустное">Грустное</button>
+            <button class="vibe-button" data-vibe="Агрессивное">
+              Агрессивное
+            </button>
+            <button class="vibe-button" data-vibe="Веселое">Веселое</button>
+            <button class="vibe-button" data-vibe="Романтичное">
+              Романтичное
+            </button>
+          </div>
         </div>
         <div class="rating">
           <h2>Оцените трек (1-10)</h2>
@@ -55,10 +74,13 @@
         <table id="track-ratings-table">
           <thead>
             <tr>
+              <th>#</th>
               <th>Название</th>
               <th>Артист</th>
               <th>Рейтинг</th>
               <th>Количество оценок</th>
+              <th>Жанр</th>
+              <th>Вайб</th>
             </tr>
           </thead>
           <tbody></tbody>
@@ -72,7 +94,25 @@
         <table id="artist-ratings-table">
           <thead>
             <tr>
+              <th>#</th>
               <th>Исполнитель</th>
+              <th>Количество песен</th>
+              <th>Средний рейтинг</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="tab-content" id="genre-ratings">
+      <div class="container">
+        <h1>Рейтинги жанров</h1>
+        <table id="genre-ratings-table">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Жанр</th>
               <th>Количество песен</th>
               <th>Средний рейтинг</th>
             </tr>

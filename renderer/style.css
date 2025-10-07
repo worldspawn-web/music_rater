@@ -40,17 +40,6 @@ body {
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
-.cover-container {
-  text-align: center;
-  margin-bottom: 20px;
-}
-
-.cover {
-  max-width: 200px;
-  max-height: 200px;
-  border-radius: 8px;
-}
-
 .track-info {
   margin: 20px 0;
 }
@@ -68,8 +57,54 @@ body {
   cursor: pointer;
 }
 
-.rating-button:hover {
-  background-color: #d0d0d0;
+.rating-button:disabled {
+  cursor: not-allowed;
+}
+
+.vibe-buttons {
+  display: flex;
+  gap: 10px;
+  margin: 20px 0;
+}
+
+.vibe-button {
+  padding: 8px 12px;
+  border: none;
+  cursor: pointer;
+  border-radius: 4px;
+}
+
+.vibe-button.active {
+  border: 2px solid #333;
+}
+
+.vibe-button:nth-child(1) {
+  background-color: #aed581;
+}
+
+.vibe-button:nth-child(2) {
+  background-color: #81d4fa;
+}
+
+.vibe-button:nth-child(3) {
+  background-color: #ff8a80;
+}
+
+.vibe-button:nth-child(4) {
+  background-color: #ffd54f;
+}
+
+.vibe-button:nth-child(5) {
+  background-color: #ce93d8;
+}
+
+.genre-section {
+  margin: 20px 0;
+}
+
+.genre-section select {
+  padding: 8px;
+  margin-right: 10px;
 }
 
 table {
@@ -86,4 +121,14 @@ td {
 
 th {
   background-color: #f2f2f2;
+}
+
+.top-three {
+  background-color: #e3f2fd;
+}
+
+.vibe-indicator {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
 }

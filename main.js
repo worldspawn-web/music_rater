@@ -2,7 +2,6 @@ const { app, BrowserWindow, ipcMain } = require('electron');
 const { exec } = require('child_process');
 const path = require('path');
 const fs = require('fs');
-const https = require('https');
 
 let mainWindow;
 
@@ -17,38 +16,6 @@ function createWindow() {
   });
 
   mainWindow.loadFile('renderer/index.html');
-}
-
-function downloadCover(albumName, url) {
-  return new Promise((resolve, reject) => {
-    const coversDir = path.join(__dirname, 'covers');
-    if (!fs.existsSync(coversDir)) {
-      fs.mkdirSync(coversDir);
-    }
-
-    const fileName = path.join(
-      coversDir,
-      `${albumName.replace(/[^a-z0-9]/gi, '_')}.jpg`
-    );
-    if (fs.existsSync(fileName)) {
-      resolve(fileName);
-      return;
-    }
-
-    const file = fs.createWriteStream(fileName);
-    https
-      .get(url, (response) => {
-        response.pipe(file);
-        file.on('finish', () => {
-          file.close();
-          resolve(fileName);
-        });
-      })
-      .on('error', (err) => {
-        fs.unlink(fileName, () => {});
-        reject(err);
-      });
-  });
 }
 
 ipcMain.handle('getCurrentTrack', async () => {
@@ -68,18 +35,20 @@ ipcMain.handle('getCurrentTrack', async () => {
   });
 });
 
-ipcMain.handle('getCover', async (event, album) => {
-  try {
-    // Используем placeholder для примера
-    const coverUrl = `https://via.placeholder.com/200?text=${encodeURIComponent(
-      album
-    )}`;
-    const coverPath = await downloadCover(album, coverUrl);
-    return coverPath;
-  } catch (error) {
-    console.error('Ошибка при загрузке обложки:', error);
+ipcMain.handle('getLastRating', async (event, trackInfo) => {
+  if (!fs.existsSync('ratings.json')) {
     return null;
   }
+
+  const ratings = JSON.parse(fs.readFileSync('ratings.json'));
+  const lastRating = ratings.find(
+    (r) =>
+      r.title === trackInfo.title &&
+      r.artist === trackInfo.artist &&
+      new Date(r.timestamp) > new Date(Date.now() - 5 * 60 * 1000)
+  );
+
+  return lastRating || null;
 });
 
 ipcMain.handle('saveRating', async (event, { trackInfo, rating }) => {
@@ -88,6 +57,8 @@ ipcMain.handle('saveRating', async (event, { trackInfo, rating }) => {
     artist: trackInfo.artist,
     album: trackInfo.album,
     rating: parseInt(rating),
+    genre: trackInfo.genre,
+    vibe: trackInfo.vibe,
     timestamp: new Date().toISOString(),
   };
 
@@ -96,7 +67,6 @@ ipcMain.handle('saveRating', async (event, { trackInfo, rating }) => {
     ratings = JSON.parse(fs.readFileSync('ratings.json'));
   }
 
-  // Проверяем, что трек не был оценён в течение последних 5 минут
   const lastRating = ratings.find(
     (r) =>
       r.title === data.title &&
@@ -128,6 +98,8 @@ ipcMain.handle('getTrackRatings', async () => {
         title: rating.title,
         artist: rating.artist,
         ratings: [],
+        genre: rating.genre,
+        vibe: rating.vibe,
       };
     }
     trackRatings[key].ratings.push(rating.rating);
@@ -140,6 +112,8 @@ ipcMain.handle('getTrackRatings', async () => {
       avgRating:
         track.ratings.reduce((sum, r) => sum + r, 0) / track.ratings.length,
       count: track.ratings.length,
+      genre: track.genre,
+      vibe: track.vibe,
     }))
     .sort((a, b) => b.avgRating - a.avgRating || b.count - a.count);
 });
@@ -170,6 +144,58 @@ ipcMain.handle('getArtistRatings', async () => {
       count: artist.ratings.length,
     }))
     .sort((a, b) => b.avgRating - a.avgRating || b.count - a.count);
+});
+
+ipcMain.handle('getGenreRatings', async () => {
+  if (!fs.existsSync('ratings.json')) {
+    return [];
+  }
+
+  const ratings = JSON.parse(fs.readFileSync('ratings.json'));
+  const genreRatings = {};
+
+  ratings.forEach((rating) => {
+    if (rating.genre) {
+      if (!genreRatings[rating.genre]) {
+        genreRatings[rating.genre] = {
+          genre: rating.genre,
+          ratings: [],
+        };
+      }
+      genreRatings[rating.genre].ratings.push(rating.rating);
+    }
+  });
+
+  return Object.values(genreRatings)
+    .map((genre) => ({
+      genre: genre.genre,
+      avgRating:
+        genre.ratings.reduce((sum, r) => sum + r, 0) / genre.ratings.length,
+      count: genre.ratings.length,
+    }))
+    .sort((a, b) => b.avgRating - a.avgRating || b.count - a.count);
+});
+
+ipcMain.handle('getGenres', async () => {
+  if (!fs.existsSync('ratings.json')) {
+    return ['Рок', 'Поп', 'Хип-Хоп', 'Электроника', 'Классика'];
+  }
+
+  const ratings = JSON.parse(fs.readFileSync('ratings.json'));
+  const genres = new Set();
+
+  ratings.forEach((rating) => {
+    if (rating.genre) {
+      genres.add(rating.genre);
+    }
+  });
+
+  return Array.from(genres);
+});
+
+ipcMain.handle('addGenre', async (event, genre) => {
+  // Жанры добавляются автоматически при сохранении рейтинга
+  return { success: true };
 });
 
 app.whenReady().then(createWindow);
