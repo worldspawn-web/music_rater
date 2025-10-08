@@ -65,6 +65,7 @@ body {
   display: flex;
   gap: 10px;
   margin: 20px 0;
+  flex-wrap: wrap;
 }
 
 .vibe-button {
@@ -87,24 +88,61 @@ body {
 }
 
 .vibe-button:nth-child(3) {
-  background-color: #ff8a80;
-}
-
-.vibe-button:nth-child(4) {
   background-color: #ffd54f;
-}
-
-.vibe-button:nth-child(5) {
-  background-color: #ce93d8;
 }
 
 .genre-section {
   margin: 20px 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
 
 .genre-section select {
   padding: 8px;
-  margin-right: 10px;
+}
+
+.add-genre-button {
+  padding: 8px 12px;
+  background-color: #e0e0e0;
+  border: none;
+  cursor: pointer;
+  border-radius: 4px;
+}
+
+.genre-input {
+  display: flex;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.genre-input input {
+  padding: 8px;
+}
+
+.genre-input button {
+  padding: 8px 12px;
+}
+
+.vibe-input {
+  display: flex;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.vibe-input input[type='text'] {
+  padding: 8px;
+}
+
+.vibe-input input[type='color'] {
+  padding: 0;
+  border: none;
+  width: 40px;
+  height: 40px;
+}
+
+.vibe-input button {
+  padding: 8px 12px;
 }
 
 table {
@@ -131,4 +169,13 @@ th {
   width: 20px;
   height: 20px;
   border-radius: 50%;
+}
+
+.add-vibe-button {
+  background-color: #e0e0e0;
+  color: #333;
+  font-size: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }

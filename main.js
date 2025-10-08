@@ -176,26 +176,4 @@ ipcMain.handle('getGenreRatings', async () => {
     .sort((a, b) => b.avgRating - a.avgRating || b.count - a.count);
 });
 
-ipcMain.handle('getGenres', async () => {
-  if (!fs.existsSync('ratings.json')) {
-    return ['Рок', 'Поп', 'Хип-Хоп', 'Электроника', 'Классика'];
-  }
-
-  const ratings = JSON.parse(fs.readFileSync('ratings.json'));
-  const genres = new Set();
-
-  ratings.forEach((rating) => {
-    if (rating.genre) {
-      genres.add(rating.genre);
-    }
-  });
-
-  return Array.from(genres);
-});
-
-ipcMain.handle('addGenre', async (event, genre) => {
-  // Жанры добавляются автоматически при сохранении рейтинга
-  return { success: true };
-});
-
 app.whenReady().then(createWindow);

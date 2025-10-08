@@ -33,21 +33,31 @@
         </div>
         <div class="genre-section">
           <label for="genre-select">Жанр:</label>
-          <select id="genre-select"></select>
-          <button id="add-genre-button">Добавить жанр</button>
+          <select id="genre-select">
+            <option value="">Выберите жанр</option>
+          </select>
+          <button class="add-genre-button" id="add-genre-button">+</button>
+          <div class="genre-input" id="genre-input" style="display: none">
+            <input type="text" id="new-genre-input" placeholder="Новый жанр" />
+            <button id="save-genre-button">Сохранить</button>
+          </div>
         </div>
         <div class="vibe-section">
           <p><strong>Вайб:</strong></p>
           <div class="vibe-buttons">
             <button class="vibe-button" data-vibe="Спокойное">Спокойное</button>
             <button class="vibe-button" data-vibe="Грустное">Грустное</button>
-            <button class="vibe-button" data-vibe="Агрессивное">
-              Агрессивное
-            </button>
             <button class="vibe-button" data-vibe="Веселое">Веселое</button>
-            <button class="vibe-button" data-vibe="Романтичное">
-              Романтичное
-            </button>
+            <button class="add-vibe-button" id="add-vibe-button">+</button>
+          </div>
+          <div class="vibe-input" id="vibe-input" style="display: none">
+            <input
+              type="text"
+              id="new-vibe-name"
+              placeholder="Название вайба"
+            />
+            <input type="color" id="new-vibe-color" value="#aed581" />
+            <button id="save-vibe-button">Сохранить</button>
           </div>
         </div>
         <div class="rating">

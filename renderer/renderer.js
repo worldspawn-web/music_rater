@@ -109,6 +109,9 @@ document.querySelectorAll('.rating-button').forEach((button) => {
       if (result.success) {
         currentRating = rating;
         blockRatingButtons(rating);
+        addGenreToStorage(genre);
+        loadGenres();
+        document.getElementById('genre-select').value = genre;
       } else {
         alert(result.message);
       }
@@ -119,14 +122,92 @@ document.querySelectorAll('.rating-button').forEach((button) => {
 });
 
 // Обработчик для кнопок вайбов
-document.querySelectorAll('.vibe-button').forEach((button) => {
-  button.addEventListener('click', () => {
-    document
-      .querySelectorAll('.vibe-button')
-      .forEach((btn) => btn.classList.remove('active'));
-    button.classList.add('active');
+document
+  .querySelectorAll('.vibe-button:not(.add-vibe-button)')
+  .forEach((button) => {
+    button.addEventListener('click', () => {
+      document
+        .querySelectorAll('.vibe-button:not(.add-vibe-button)')
+        .forEach((btn) => btn.classList.remove('active'));
+      button.classList.add('active');
+    });
   });
+
+// Обработчик для кнопки добавления жанра
+document.getElementById('add-genre-button').addEventListener('click', () => {
+  document.getElementById('genre-input').style.display = 'flex';
 });
+
+// Обработчик для кнопки сохранения нового жанра
+document.getElementById('save-genre-button').addEventListener('click', () => {
+  const newGenre = document.getElementById('new-genre-input').value;
+  if (newGenre) {
+    addGenreToStorage(newGenre);
+    loadGenres();
+    document.getElementById('genre-select').value = newGenre;
+    document.getElementById('new-genre-input').value = '';
+    document.getElementById('genre-input').style.display = 'none';
+  }
+});
+
+// Функция для добавления жанра в localStorage
+function addGenreToStorage(genre) {
+  let genres = JSON.parse(localStorage.getItem('genres') || '[]');
+  if (!genres.includes(genre)) {
+    genres.push(genre);
+    localStorage.setItem('genres', JSON.stringify(genres));
+  }
+}
+
+// Загрузка жанров в выпадающий список
+function loadGenres() {
+  const genres = JSON.parse(localStorage.getItem('genres') || '[]');
+  const genreSelect = document.getElementById('genre-select');
+  genreSelect.innerHTML = '<option value="">Выберите жанр</option>';
+  genres.forEach((genre) => {
+    const option = document.createElement('option');
+    option.value = genre;
+    option.textContent = genre;
+    genreSelect.appendChild(option);
+  });
+}
+
+// Обработчик для кнопки добавления вайба
+document.getElementById('add-vibe-button').addEventListener('click', () => {
+  document.getElementById('vibe-input').style.display = 'flex';
+});
+
+// Обработчик для кнопки сохранения нового вайба
+document.getElementById('save-vibe-button').addEventListener('click', () => {
+  const newVibeName = document.getElementById('new-vibe-name').value;
+  const newVibeColor = document.getElementById('new-vibe-color').value;
+
+  if (newVibeName) {
+    addVibe(newVibeName, newVibeColor);
+    document.getElementById('new-vibe-name').value = '';
+    document.getElementById('vibe-input').style.display = 'none';
+  }
+});
+
+// Функция для добавления нового вайба
+function addVibe(name, color) {
+  const vibeButtons = document.querySelector('.vibe-buttons');
+  const newVibeButton = document.createElement('button');
+  newVibeButton.className = 'vibe-button';
+  newVibeButton.textContent = name;
+  newVibeButton.setAttribute('data-vibe', name);
+  newVibeButton.style.backgroundColor = color;
+  newVibeButton.addEventListener('click', () => {
+    document
+      .querySelectorAll('.vibe-button:not(.add-vibe-button)')
+      .forEach((btn) => btn.classList.remove('active'));
+    newVibeButton.classList.add('active');
+  });
+  vibeButtons.insertBefore(
+    newVibeButton,
+    document.getElementById('add-vibe-button')
+  );
+}
 
 // Загрузка рейтингов треков
 async function loadTrackRatings() {
@@ -213,58 +294,13 @@ function getVibeColor(vibe) {
   const vibeColors = {
     Спокойное: '#aed581',
     Грустное: '#81d4fa',
-    Агрессивное: '#ff8a80',
     Веселое: '#ffd54f',
-    Романтичное: '#ce93d8',
   };
   return vibeColors[vibe] || '#e0e0e0';
 }
 
 // Обновляем информацию о треке каждые 5 секунд
 setInterval(fetchCurrentTrack, 5000);
-
-// Загрузка жанров в выпадающий список
-async function loadGenres() {
-  const genres = await ipcRenderer.invoke('getGenres');
-  const genreSelect = document.getElementById('genre-select');
-  genreSelect.innerHTML = '';
-  const defaultGenres = ['Рок', 'Поп', 'Хип-Хоп', 'Электроника', 'Классика'];
-  defaultGenres.forEach((genre) => {
-    const option = document.createElement('option');
-    option.value = genre;
-    option.textContent = genre;
-    genreSelect.appendChild(option);
-  });
-  genres.forEach((genre) => {
-    if (!defaultGenres.includes(genre)) {
-      const option = document.createElement('option');
-      option.value = genre;
-      option.textContent = genre;
-      genreSelect.appendChild(option);
-    }
-  });
-}
-
-// Добавление нового жанра
-document
-  .getElementById('add-genre-button')
-  .addEventListener('click', async () => {
-    const newGenre = prompt('Введите название нового жанра:');
-    if (newGenre) {
-      await ipcRenderer.invoke('addGenre', newGenre);
-      loadGenres();
-    }
-  });
-
-// Обработчик для кнопок вайбов
-document.querySelectorAll('.vibe-button').forEach((button) => {
-  button.addEventListener('click', () => {
-    document
-      .querySelectorAll('.vibe-button')
-      .forEach((btn) => btn.classList.remove('active'));
-    button.classList.add('active');
-  });
-});
 
 // Инициализация
 document.addEventListener('DOMContentLoaded', () => {
