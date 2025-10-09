@@ -1312,9 +1312,6 @@ select {
   font-size: 1rem;
   color: var(--color-text-secondary);
   margin: 0;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 
 .top-three-genre {

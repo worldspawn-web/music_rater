@@ -228,10 +228,7 @@ document.querySelectorAll('.rating-button').forEach((button) => {
   button.addEventListener('click', async () => {
     const rating = Number.parseInt(button.getAttribute('data-rating'));
     const trackTitle = document.getElementById('track-title').textContent;
-    const trackArtistElement = document.getElementById('track-artist');
-    const trackArtist =
-      trackArtistElement.textContent.split(' ').slice(0, -1).join(' ').trim() ||
-      trackArtistElement.textContent;
+    const trackArtist = currentTrackInfo.artist;
     const trackAlbum = document.getElementById('track-album').textContent;
     const genre = document.getElementById('genre-select').value;
     const vibeButton = document.querySelector('.vibe-chip.active');
@@ -262,21 +259,24 @@ document.querySelectorAll('.rating-button').forEach((button) => {
           (r) => r.artist === trackArtist
         );
         if (artistRating) {
-          const oldRatingElement =
-            trackArtistElement.querySelector('.artist-rating');
+          const oldRatingElement = document
+            .getElementById('track-artist')
+            .querySelector('.artist-rating');
           const oldRating = oldRatingElement
             ? Number.parseFloat(oldRatingElement.textContent)
             : 0;
 
           if (oldRating > 0 && oldRating !== artistRating.avgRating) {
             animateRatingChange(
-              trackArtistElement,
+              document.getElementById('track-artist'),
               oldRating,
               artistRating.avgRating
             );
           } else {
             const ratingColor = getRatingColor(artistRating.avgRating);
-            trackArtistElement.innerHTML = `${trackArtist} <span class="artist-rating" style="color: ${ratingColor}; font-weight: 700; margin-left: 0.5rem;">${artistRating.avgRating.toFixed(
+            document.getElementById(
+              'track-artist'
+            ).innerHTML = `${trackArtist} <span class="artist-rating" style="color: ${ratingColor}; font-weight: 700; margin-left: 0.5rem;">${artistRating.avgRating.toFixed(
               1
             )}</span>`;
           }

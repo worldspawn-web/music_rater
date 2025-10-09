@@ -126,12 +126,22 @@ class NowPlayingService {
    */
   static async getCurrentTrack() {
     try {
-      const output = await execPromise('nowplaying-cli get title album artist');
-      const [title, album, artist] = output.split('\n');
+      const title = await execPromise('nowplaying-cli get title');
+      const album = await execPromise('nowplaying-cli get album');
+      const artist = await execPromise('nowplaying-cli get artist');
 
       if (!title || !artist) {
         throw new Error('Invalid track data');
       }
+
+      console.log(
+        '[v0] Track info - Title:',
+        title,
+        'Artist:',
+        artist,
+        'Album:',
+        album
+      );
 
       return { title, album: album || 'Unknown Album', artist };
     } catch (error) {
