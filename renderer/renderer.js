@@ -34,18 +34,17 @@ function extractColorsFromImage(img) {
   const canvas = document.createElement('canvas');
   const ctx = canvas.getContext('2d');
 
-  canvas.width = 200;
-  canvas.height = 200;
+  canvas.width = 300;
+  canvas.height = 300;
 
-  ctx.drawImage(img, 0, 0, 200, 200);
+  ctx.drawImage(img, 0, 0, 300, 300);
 
   try {
-    const imageData = ctx.getImageData(0, 0, 200, 200);
+    const imageData = ctx.getImageData(0, 0, 300, 300);
     const data = imageData.data;
     const colorMap = new Map();
 
-    for (let i = 0; i < data.length; i += 4 * 4) {
-      // Sample every 4th pixel instead of 10th
+    for (let i = 0; i < data.length; i += 4 * 2) {
       const r = data[i];
       const g = data[i + 1];
       const b = data[i + 2];
@@ -60,9 +59,9 @@ function extractColorsFromImage(img) {
         continue;
       }
 
-      const qr = Math.round(r / 16) * 16;
-      const qg = Math.round(g / 16) * 16;
-      const qb = Math.round(b / 16) * 16;
+      const qr = Math.round(r / 12) * 12;
+      const qg = Math.round(g / 12) * 12;
+      const qb = Math.round(b / 12) * 12;
       const key = `${qr},${qg},${qb}`;
 
       colorMap.set(key, (colorMap.get(key) || 0) + 1);
@@ -70,7 +69,7 @@ function extractColorsFromImage(img) {
 
     const sortedColors = Array.from(colorMap.entries())
       .sort((a, b) => b[1] - a[1])
-      .slice(0, 10)
+      .slice(0, 15)
       .map((entry) => entry[0]);
 
     if (sortedColors.length === 0) {
@@ -82,15 +81,15 @@ function extractColorsFromImage(img) {
     }
 
     const primary = `rgb(${sortedColors[0]})`;
-    const secondary = sortedColors[2]
-      ? `rgb(${sortedColors[2]})`
+    const secondary = sortedColors[3]
+      ? `rgb(${sortedColors[3]})`
       : sortedColors[1]
       ? `rgb(${sortedColors[1]})`
       : primary;
-    const tertiary = sortedColors[4]
-      ? `rgb(${sortedColors[4]})`
-      : sortedColors[1]
-      ? `rgb(${sortedColors[1]})`
+    const tertiary = sortedColors[6]
+      ? `rgb(${sortedColors[6]})`
+      : sortedColors[2]
+      ? `rgb(${sortedColors[2]})`
       : primary;
 
     console.log('[v0] Extracted colors:', { primary, secondary, tertiary });
@@ -140,7 +139,23 @@ async function fetchCurrentTrack() {
   try {
     const trackInfo = await ipcRenderer.invoke('getCurrentTrack');
     document.getElementById('track-title').textContent = trackInfo.title;
-    document.getElementById('track-artist').textContent = trackInfo.artist;
+
+    const artistElement = document.getElementById('track-artist');
+    const artistRatings = await ipcRenderer.invoke('getArtistRatings');
+    const artistRating = artistRatings.find(
+      (r) => r.artist === trackInfo.artist
+    );
+
+    if (artistRating) {
+      artistElement.innerHTML = `${
+        trackInfo.artist
+      } <span style="color: var(--color-accent-primary); font-weight: 700; margin-left: 0.5rem;">${artistRating.avgRating.toFixed(
+        1
+      )}</span>`;
+    } else {
+      artistElement.textContent = trackInfo.artist;
+    }
+
     document.getElementById('track-album').textContent = trackInfo.album;
 
     const albumCover = document.getElementById('album-cover');
