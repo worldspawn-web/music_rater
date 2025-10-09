@@ -420,10 +420,10 @@ async function loadTrackRatings() {
     const top3 = limitedRatings.slice(0, 3);
     const rest = limitedRatings.slice(3);
 
-    // Create top 3 cards
-    top3.forEach((rating, index) => {
-      topThree.appendChild(createTopThreeCard(rating, index + 1, 'track'));
-    });
+    for (let i = 0; i < top3.length; i++) {
+      const card = await createTopThreeCard(top3[i], i + 1, 'track');
+      topThree.appendChild(card);
+    }
 
     // Create table for rest
     if (rest.length > 0) {
@@ -521,7 +521,7 @@ async function loadGenreRatings() {
  * @param {string} type - Type (track, artist, genre)
  * @returns {HTMLElement} Top three card element
  */
-function createTopThreeCard(item, rank, type) {
+async function createTopThreeCard(item, rank, type) {
   const card = document.createElement('div');
   card.className = `top-three-card top-three-rank-${rank}`;
 
@@ -536,7 +536,24 @@ function createTopThreeCard(item, rank, type) {
   let content = '';
 
   if (type === 'track') {
-    const coverPath = item.coverPath || '../covers/placeholder.png';
+    const artistRatings = await ipcRenderer.invoke('getArtistRatings');
+    const genreRatings = await ipcRenderer.invoke('getGenreRatings');
+
+    const artistRating = artistRatings.find((r) => r.artist === item.artist);
+    const artistRank =
+      artistRatings.findIndex((r) => r.artist === item.artist) + 1;
+
+    const genreRating = item.genre
+      ? genreRatings.find((r) => r.genre === item.genre)
+      : null;
+    const genreRank = item.genre
+      ? genreRatings.findIndex((r) => r.genre === item.genre) + 1
+      : null;
+
+    const coverPath = item.coverPath
+      ? `../${item.coverPath}?t=${Date.now()}`
+      : '../covers/placeholder.png';
+
     content = `
       <div class="top-three-effect ${effect}"></div>
       <div class="top-three-rank">${emoji}</div>
@@ -548,9 +565,30 @@ function createTopThreeCard(item, rank, type) {
       <div class="top-three-content">
         <div class="top-three-position">#${rank}</div>
         <h3 class="top-three-title">${item.title}</h3>
-        <p class="top-three-subtitle">${item.artist}</p>
+        <p class="top-three-subtitle">
+          ${item.artist}
+          ${
+            artistRating
+              ? `<span style="color: ${getRatingColor(
+                  artistRating.avgRating
+                )}; font-weight: 600; margin-left: 0.5rem;">${artistRating.avgRating.toFixed(
+                  1
+                )}</span> <span style="color: var(--color-text-tertiary); font-size: 0.75rem;">(#${artistRank})</span>`
+              : ''
+          }
+        </p>
         ${
-          item.genre ? `<span class="top-three-genre">${item.genre}</span>` : ''
+          item.genre
+            ? `<span class="top-three-genre">${item.genre}${
+                genreRating
+                  ? ` <span style="color: ${getRatingColor(
+                      genreRating.avgRating
+                    )}; font-weight: 600;">${genreRating.avgRating.toFixed(
+                      1
+                    )}</span> <span style="color: var(--color-text-tertiary); font-size: 0.75rem;">(#${genreRank})</span>`
+                  : ''
+              }</span>`
+            : ''
         }
       </div>
       <div class="top-three-stats">
