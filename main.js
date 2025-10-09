@@ -36,14 +36,20 @@ let mainWindow = null;
 
 /**
  * Sanitizes a string to be used as a filename
+ * Handles Cyrillic and special characters properly
  * @param {string} str - String to sanitize
  * @returns {string} Sanitized filename
  */
 function sanitizeFilename(str) {
-  return str
+  const crypto = require('crypto');
+  const hash = crypto.createHash('md5').update(str).digest('hex');
+  const safe = str
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
     .replace(/[^a-z0-9]/gi, '_')
     .toLowerCase()
-    .substring(0, 100); // Limit length
+    .substring(0, 50);
+  return `${safe}_${hash.substring(0, 8)}`;
 }
 
 /**
@@ -140,9 +146,7 @@ class NowPlayingService {
    */
   static async getArtworkData() {
     try {
-      const artworkData = await execPromise(
-        'nowplaying-cli get artworkData --width 1000 --height 1000'
-      );
+      const artworkData = await execPromise('nowplaying-cli get artworkData');
 
       if (!artworkData || artworkData === 'null' || artworkData === '') {
         return null;
@@ -151,16 +155,7 @@ class NowPlayingService {
       return artworkData;
     } catch (error) {
       console.warn('Error getting artwork:', error.message);
-      try {
-        const fallbackData = await execPromise(
-          'nowplaying-cli get artworkData'
-        );
-        return fallbackData && fallbackData !== 'null' && fallbackData !== ''
-          ? fallbackData
-          : null;
-      } catch (fallbackError) {
-        return null;
-      }
+      return null;
     }
   }
 }
@@ -179,18 +174,15 @@ class CoverService {
 
   /**
    * Saves album cover to disk
-   * @param {string} artist - Artist name
-   * @param {string} title - Track title
+   * @param {string} album - Album name
    * @param {string} artworkData - Base64 artwork data
    * @returns {Promise<string|null>} Relative path to saved cover or null
    */
-  static async saveCover(artist, title, artworkData) {
+  static async saveCover(album, artworkData) {
     if (!artworkData) return null;
 
     try {
-      const filename = `${sanitizeFilename(artist)}_${sanitizeFilename(
-        title
-      )}.jpg`;
+      const filename = `${sanitizeFilename(album)}.jpg`;
       const coverPath = path.join(__dirname, CONSTANTS.PATHS.COVERS, filename);
 
       // Check if cover already exists
@@ -434,8 +426,7 @@ function registerIpcHandlers() {
       const trackInfo = await NowPlayingService.getCurrentTrack();
       const artworkData = await NowPlayingService.getArtworkData();
       const coverPath = await CoverService.saveCover(
-        trackInfo.artist,
-        trackInfo.title,
+        trackInfo.album,
         artworkData
       );
 
