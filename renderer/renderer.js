@@ -460,10 +460,10 @@ async function loadArtistRatings() {
     const top3 = limitedRatings.slice(0, 3);
     const rest = limitedRatings.slice(3);
 
-    // Create top 3 cards
-    top3.forEach((rating, index) => {
-      topThree.appendChild(createTopThreeCard(rating, index + 1, 'artist'));
-    });
+    for (let i = 0; i < top3.length; i++) {
+      const card = await createTopThreeCard(top3[i], i + 1, 'artist');
+      topThree.appendChild(card);
+    }
 
     // Create table for rest
     if (rest.length > 0) {
@@ -500,10 +500,10 @@ async function loadGenreRatings() {
     const top3 = limitedRatings.slice(0, 3);
     const rest = limitedRatings.slice(3);
 
-    // Create top 3 cards
-    top3.forEach((rating, index) => {
-      topThree.appendChild(createTopThreeCard(rating, index + 1, 'genre'));
-    });
+    for (let i = 0; i < top3.length; i++) {
+      const card = await createTopThreeCard(top3[i], i + 1, 'genre');
+      topThree.appendChild(card);
+    }
 
     // Create table for rest
     if (rest.length > 0) {
