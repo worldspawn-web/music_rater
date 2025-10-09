@@ -79,10 +79,21 @@
 
     <main class="main-content">
       <section class="tab-content active" id="current-track">
+        <div class="dynamic-background" id="dynamic-background">
+          <div class="gradient-orb orb-1"></div>
+          <div class="gradient-orb orb-2"></div>
+          <div class="gradient-orb orb-3"></div>
+        </div>
+
         <div class="hero-section">
           <div class="album-artwork">
             <div class="artwork-wrapper">
-              <img id="album-cover" class="cover-image" alt="Album Cover" />
+              <img
+                id="album-cover"
+                class="cover-image"
+                alt="Album Cover"
+                crossorigin="anonymous"
+              />
               <div id="no-cover" class="no-cover-placeholder">
                 <svg
                   viewBox="0 0 24 24"
@@ -106,7 +117,7 @@
               <p id="track-album" class="track-album"></p>
             </div>
 
-            <div class="metadata-section">
+            <div class="metadata-section glass-card">
               <div class="genre-selector">
                 <label for="genre-select" class="input-label">Жанр</label>
                 <div class="select-group">
@@ -198,7 +209,8 @@
               </div>
             </div>
 
-            <div class="rating-section">
+            <!-- Added glass-card class for glassmorphism effect -->
+            <div class="rating-section glass-card">
               <h2 class="section-title">Оцените трек</h2>
               <div class="rating-grid">
                 <button class="rating-button" data-rating="1">1</button>

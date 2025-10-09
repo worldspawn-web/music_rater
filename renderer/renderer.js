@@ -25,6 +25,108 @@ document.querySelectorAll('.nav-tab').forEach((button) => {
   });
 });
 
+/**
+ * Extracts dominant colors from an image
+ * @param {HTMLImageElement} img - Image element
+ * @returns {Object} Object with primary, secondary, and tertiary colors
+ */
+function extractColorsFromImage(img) {
+  const canvas = document.createElement('canvas');
+  const ctx = canvas.getContext('2d');
+
+  // Use smaller canvas for performance
+  canvas.width = 100;
+  canvas.height = 100;
+
+  ctx.drawImage(img, 0, 0, 100, 100);
+
+  try {
+    const imageData = ctx.getImageData(0, 0, 100, 100);
+    const data = imageData.data;
+    const colorMap = new Map();
+
+    // Sample colors and count occurrences
+    for (let i = 0; i < data.length; i += 4 * 10) {
+      // Sample every 10th pixel
+      const r = data[i];
+      const g = data[i + 1];
+      const b = data[i + 2];
+      const a = data[i + 3];
+
+      // Skip transparent and very dark/light pixels
+      if (
+        a < 128 ||
+        (r < 20 && g < 20 && b < 20) ||
+        (r > 235 && g > 235 && b > 235)
+      ) {
+        continue;
+      }
+
+      // Quantize colors to reduce variations
+      const qr = Math.round(r / 32) * 32;
+      const qg = Math.round(g / 32) * 32;
+      const qb = Math.round(b / 32) * 32;
+      const key = `${qr},${qg},${qb}`;
+
+      colorMap.set(key, (colorMap.get(key) || 0) + 1);
+    }
+
+    // Sort by frequency and get top colors
+    const sortedColors = Array.from(colorMap.entries())
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5)
+      .map((entry) => entry[0]);
+
+    if (sortedColors.length === 0) {
+      return {
+        primary: 'rgb(255, 68, 68)',
+        secondary: 'rgb(255, 107, 107)',
+        tertiary: 'rgb(204, 51, 51)',
+      };
+    }
+
+    // Convert to RGB strings
+    const primary = `rgb(${sortedColors[0]})`;
+    const secondary = sortedColors[1] ? `rgb(${sortedColors[1]})` : primary;
+    const tertiary = sortedColors[2] ? `rgb(${sortedColors[2]})` : primary;
+
+    return { primary, secondary, tertiary };
+  } catch (error) {
+    console.warn('Could not extract colors from image:', error);
+    return {
+      primary: 'rgb(255, 68, 68)',
+      secondary: 'rgb(255, 107, 107)',
+      tertiary: 'rgb(204, 51, 51)',
+    };
+  }
+}
+
+/**
+ * Updates the dynamic background with colors from album cover
+ * @param {HTMLImageElement} img - Album cover image
+ */
+function updateDynamicBackground(img) {
+  const background = document.getElementById('dynamic-background');
+  const colors = extractColorsFromImage(img);
+
+  // Update CSS variables
+  document.documentElement.style.setProperty(
+    '--dynamic-color-primary',
+    colors.primary
+  );
+  document.documentElement.style.setProperty(
+    '--dynamic-color-secondary',
+    colors.secondary
+  );
+  document.documentElement.style.setProperty(
+    '--dynamic-color-tertiary',
+    colors.tertiary
+  );
+
+  // Activate background with fade-in
+  background.classList.add('active');
+}
+
 // Функция для получения текущего трека
 let currentTrackInfo = null;
 let currentRating = null;
@@ -38,14 +140,20 @@ async function fetchCurrentTrack() {
 
     const albumCover = document.getElementById('album-cover');
     const noCover = document.getElementById('no-cover');
+    const background = document.getElementById('dynamic-background');
 
     if (trackInfo.coverPath) {
       albumCover.src = '../' + trackInfo.coverPath;
       albumCover.style.display = 'block';
       noCover.style.display = 'none';
+
+      albumCover.onload = () => {
+        updateDynamicBackground(albumCover);
+      };
     } else {
       albumCover.style.display = 'none';
       noCover.style.display = 'flex';
+      background.classList.remove('active');
     }
 
     // Сбрасываем состояние кнопок рейтинга при смене трека
