@@ -29,6 +29,7 @@ const CONSTANTS = {
 // ============================================================================
 
 let mainWindow = null;
+let lastTrackCache = null;
 
 // ============================================================================
 // UTILITIES
@@ -134,15 +135,6 @@ class NowPlayingService {
         throw new Error('Invalid track data');
       }
 
-      console.log(
-        '[v0] Track info - Title:',
-        title,
-        'Artist:',
-        artist,
-        'Album:',
-        album
-      );
-
       return { title, album: album || 'Unknown Album', artist };
     } catch (error) {
       console.error('Error getting current track:', error);
@@ -161,15 +153,6 @@ class NowPlayingService {
       if (!artworkData || artworkData === 'null' || artworkData === '') {
         return null;
       }
-
-      console.log(
-        `[v0] Artwork data received: ${(artworkData.length / 1024).toFixed(
-          2
-        )} KB`
-      );
-      console.log(
-        `[v0] Artwork data starts with: ${artworkData.substring(0, 50)}...`
-      );
 
       return artworkData;
     } catch (error) {
@@ -206,7 +189,7 @@ class CoverService {
 
       // Check if cover already exists
       if (fsSync.existsSync(coverPath)) {
-        console.log(`[v0] Cover already exists: ${filename}`);
+        console.log(`Cover already exists: ${filename}`);
         return `${CONSTANTS.PATHS.COVERS}/${filename}`;
       }
 
@@ -216,11 +199,9 @@ class CoverService {
 
       await fs.writeFile(coverPath, buffer);
       console.log(
-        `[v0] Saved cover: ${filename} (${(buffer.length / 1024).toFixed(
-          2
-        )} KB)`
+        `Saved cover: ${filename} (${(buffer.length / 1024).toFixed(2)} KB)`
       );
-      console.log(`[v0] Buffer length: ${buffer.length} bytes`);
+      console.log(`Buffer length: ${buffer.length} bytes`);
 
       return `${CONSTANTS.PATHS.COVERS}/${filename}`;
     } catch (error) {
@@ -474,16 +455,38 @@ function registerIpcHandlers() {
   ipcMain.handle('getCurrentTrack', async () => {
     try {
       const trackInfo = await NowPlayingService.getCurrentTrack();
+      const trackKey = `${trackInfo.title}|||${trackInfo.artist}`;
+
+      if (lastTrackCache && lastTrackCache.key === trackKey) {
+        // Track hasn't changed - return cached data without logging
+        return lastTrackCache.data;
+      }
+
+      console.log(`🎵 Track changed: ${trackInfo.title} - ${trackInfo.artist}`);
+
       const artworkData = await NowPlayingService.getArtworkData();
+      if (artworkData) {
+        console.log(
+          `Artwork data received: ${(artworkData.length / 1024).toFixed(2)} KB`
+        );
+      }
+
       const coverPath = await CoverService.saveCover(
         trackInfo.album,
         artworkData
       );
 
-      return {
+      const result = {
         ...trackInfo,
         coverPath,
       };
+
+      lastTrackCache = {
+        key: trackKey,
+        data: result,
+      };
+
+      return result;
     } catch (error) {
       console.error('IPC Error - getCurrentTrack:', error);
       throw error;

@@ -92,7 +92,7 @@ function extractColorsFromImage(img) {
       ? `rgb(${sortedColors[2]})`
       : primary;
 
-    console.log('[v0] Extracted colors:', { primary, secondary, tertiary });
+    console.log('Extracted colors:', { primary, secondary, tertiary });
 
     return { primary, secondary, tertiary };
   } catch (error) {
@@ -134,10 +134,26 @@ function updateDynamicBackground(img) {
 // Функция для получения текущего трека
 let currentTrackInfo = null;
 let currentRating = null;
+let previousTrackKey = null;
 
 async function fetchCurrentTrack() {
   try {
     const trackInfo = await ipcRenderer.invoke('getCurrentTrack');
+
+    const trackKey = `${trackInfo.title}|||${trackInfo.artist}`;
+
+    if (previousTrackKey === trackKey) {
+      // Track hasn't changed, skip all updates silently
+      return;
+    }
+
+    // Track has changed
+    if (previousTrackKey !== null) {
+      console.log(`Трек сменился: ${trackInfo.artist} - ${trackInfo.title}`);
+    }
+
+    previousTrackKey = trackKey;
+
     document.getElementById('track-title').textContent = trackInfo.title;
 
     const artistElement = document.getElementById('track-artist');
