@@ -152,6 +152,15 @@ class NowPlayingService {
         return null;
       }
 
+      console.log(
+        `[v0] Artwork data received: ${(artworkData.length / 1024).toFixed(
+          2
+        )} KB`
+      );
+      console.log(
+        `[v0] Artwork data starts with: ${artworkData.substring(0, 50)}...`
+      );
+
       return artworkData;
     } catch (error) {
       console.warn('Error getting artwork:', error.message);
@@ -187,6 +196,7 @@ class CoverService {
 
       // Check if cover already exists
       if (fsSync.existsSync(coverPath)) {
+        console.log(`[v0] Cover already exists: ${filename}`);
         return `${CONSTANTS.PATHS.COVERS}/${filename}`;
       }
 
@@ -196,8 +206,11 @@ class CoverService {
 
       await fs.writeFile(coverPath, buffer);
       console.log(
-        `Saved cover: ${filename} (${(buffer.length / 1024).toFixed(2)} KB)`
+        `[v0] Saved cover: ${filename} (${(buffer.length / 1024).toFixed(
+          2
+        )} KB)`
       );
+      console.log(`[v0] Buffer length: ${buffer.length} bytes`);
 
       return `${CONSTANTS.PATHS.COVERS}/${filename}`;
     } catch (error) {
@@ -293,6 +306,7 @@ class RatingService {
         trackMap.set(key, {
           title: rating.title,
           artist: rating.artist,
+          album: rating.album,
           ratings: [],
           genre: rating.genre,
           vibe: rating.vibe,
@@ -307,11 +321,13 @@ class RatingService {
       .map((track) => ({
         title: track.title,
         artist: track.artist,
+        album: track.album,
         avgRating:
           track.ratings.reduce((sum, r) => sum + r, 0) / track.ratings.length,
         count: track.ratings.length,
         genre: track.genre,
         vibe: track.vibe,
+        coverPath: `covers/${sanitizeFilename(track.album)}.png`,
       }))
       .sort((a, b) => b.avgRating - a.avgRating || b.count - a.count);
   }

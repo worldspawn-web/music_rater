@@ -398,41 +398,37 @@ function addVibe(name, color) {
 async function loadTrackRatings() {
   try {
     const ratings = await ipcRenderer.invoke('getTrackRatings');
-    const tableBody = document.getElementById('track-ratings-tbody');
+    const topThree = document.getElementById('track-top-three');
+    const table = document.getElementById('track-ratings-table');
     const emptyState = document.getElementById('track-ratings-empty');
 
-    tableBody.innerHTML = '';
+    topThree.innerHTML = '';
+    table.innerHTML = '';
 
     if (ratings.length === 0) {
       emptyState.classList.remove('hidden');
+      topThree.style.display = 'none';
+      table.style.display = 'none';
       return;
     }
 
     emptyState.classList.add('hidden');
+    topThree.style.display = 'flex';
+    table.style.display = 'block';
 
-    ratings.forEach((rating, index) => {
-      const row = document.createElement('tr');
-      row.innerHTML = `
-        <td class="rank-cell">${index + 1}</td>
-        <td class="title-cell">${rating.title}</td>
-        <td>${rating.artist}</td>
-        <td class="rating-cell">
-          <span class="rating-badge">${rating.avgRating.toFixed(1)}</span>
-        </td>
-        <td class="count-cell">${rating.count}</td>
-        <td>${rating.genre || '—'}</td>
-        <td class="vibe-cell">
-          ${
-            rating.vibe
-              ? `<span class="vibe-badge" style="--vibe-color: ${getVibeColor(
-                  rating.vibe
-                )}">${rating.vibe}</span>`
-              : '—'
-          }
-        </td>
-      `;
-      tableBody.appendChild(row);
+    const limitedRatings = ratings.slice(0, 100);
+    const top3 = limitedRatings.slice(0, 3);
+    const rest = limitedRatings.slice(3);
+
+    // Create top 3 cards
+    top3.forEach((rating, index) => {
+      topThree.appendChild(createTopThreeCard(rating, index + 1, 'track'));
     });
+
+    // Create table for rest
+    if (rest.length > 0) {
+      table.appendChild(createRatingsTable(rest, 4, 'track'));
+    }
   } catch (error) {
     console.error('Ошибка при загрузке рейтингов треков:', error);
   }
@@ -442,30 +438,37 @@ async function loadTrackRatings() {
 async function loadArtistRatings() {
   try {
     const ratings = await ipcRenderer.invoke('getArtistRatings');
-    const tableBody = document.getElementById('artist-ratings-tbody');
+    const topThree = document.getElementById('artist-top-three');
+    const table = document.getElementById('artist-ratings-table');
     const emptyState = document.getElementById('artist-ratings-empty');
 
-    tableBody.innerHTML = '';
+    topThree.innerHTML = '';
+    table.innerHTML = '';
 
     if (ratings.length === 0) {
       emptyState.classList.remove('hidden');
+      topThree.style.display = 'none';
+      table.style.display = 'none';
       return;
     }
 
     emptyState.classList.add('hidden');
+    topThree.style.display = 'flex';
+    table.style.display = 'block';
 
-    ratings.forEach((rating, index) => {
-      const row = document.createElement('tr');
-      row.innerHTML = `
-        <td class="rank-cell">${index + 1}</td>
-        <td class="title-cell">${rating.artist}</td>
-        <td class="count-cell">${rating.count}</td>
-        <td class="rating-cell">
-          <span class="rating-badge">${rating.avgRating.toFixed(1)}</span>
-        </td>
-      `;
-      tableBody.appendChild(row);
+    const limitedRatings = ratings.slice(0, 100);
+    const top3 = limitedRatings.slice(0, 3);
+    const rest = limitedRatings.slice(3);
+
+    // Create top 3 cards
+    top3.forEach((rating, index) => {
+      topThree.appendChild(createTopThreeCard(rating, index + 1, 'artist'));
     });
+
+    // Create table for rest
+    if (rest.length > 0) {
+      table.appendChild(createRatingsTable(rest, 4, 'artist'));
+    }
   } catch (error) {
     console.error('Ошибка при загрузке рейтингов исполнителей:', error);
   }
@@ -475,33 +478,230 @@ async function loadArtistRatings() {
 async function loadGenreRatings() {
   try {
     const ratings = await ipcRenderer.invoke('getGenreRatings');
-    const tableBody = document.getElementById('genre-ratings-tbody');
+    const topThree = document.getElementById('genre-top-three');
+    const table = document.getElementById('genre-ratings-table');
     const emptyState = document.getElementById('genre-ratings-empty');
 
-    tableBody.innerHTML = '';
+    topThree.innerHTML = '';
+    table.innerHTML = '';
 
     if (ratings.length === 0) {
       emptyState.classList.remove('hidden');
+      topThree.style.display = 'none';
+      table.style.display = 'none';
       return;
     }
 
     emptyState.classList.add('hidden');
+    topThree.style.display = 'flex';
+    table.style.display = 'block';
 
-    ratings.forEach((rating, index) => {
-      const row = document.createElement('tr');
-      row.innerHTML = `
-        <td class="rank-cell">${index + 1}</td>
-        <td class="title-cell">${rating.genre}</td>
-        <td class="count-cell">${rating.count}</td>
-        <td class="rating-cell">
-          <span class="rating-badge">${rating.avgRating.toFixed(1)}</span>
-        </td>
-      `;
-      tableBody.appendChild(row);
+    const limitedRatings = ratings.slice(0, 100);
+    const top3 = limitedRatings.slice(0, 3);
+    const rest = limitedRatings.slice(3);
+
+    // Create top 3 cards
+    top3.forEach((rating, index) => {
+      topThree.appendChild(createTopThreeCard(rating, index + 1, 'genre'));
     });
+
+    // Create table for rest
+    if (rest.length > 0) {
+      table.appendChild(createRatingsTable(rest, 4, 'genre'));
+    }
   } catch (error) {
     console.error('Ошибка при загрузке рейтингов жанров:', error);
   }
+}
+
+/**
+ * Creates a top 3 card with special effects and album cover
+ * @param {Object} item - Rating item
+ * @param {number} rank - Rank (1, 2, or 3)
+ * @param {string} type - Type (track, artist, genre)
+ * @returns {HTMLElement} Top three card element
+ */
+function createTopThreeCard(item, rank, type) {
+  const card = document.createElement('div');
+  card.className = `top-three-card top-three-rank-${rank}`;
+
+  const effects = {
+    1: { emoji: '🔥', effect: 'fire', color: '#FFD700' },
+    2: { emoji: '❄️', effect: 'ice', color: '#C0C0C0' },
+    3: { emoji: '⚡', effect: 'lightning', color: '#CD7F32' },
+  };
+
+  const { emoji, effect, color } = effects[rank];
+
+  let content = '';
+
+  if (type === 'track') {
+    const coverPath = item.coverPath || '../covers/placeholder.png';
+    content = `
+      <div class="top-three-effect ${effect}"></div>
+      <div class="top-three-rank">${emoji}</div>
+      <div class="top-three-cover">
+        <img src="${coverPath}" alt="${
+      item.title
+    }" onerror="this.style.display='none'" />
+      </div>
+      <div class="top-three-content">
+        <div class="top-three-position">#${rank}</div>
+        <h3 class="top-three-title">${item.title}</h3>
+        <p class="top-three-subtitle">${item.artist}</p>
+        ${
+          item.genre ? `<span class="top-three-genre">${item.genre}</span>` : ''
+        }
+      </div>
+      <div class="top-three-stats">
+        <div class="top-three-rating" style="color: ${getRatingColor(
+          item.avgRating
+        )}">
+          ${item.avgRating.toFixed(1)}
+        </div>
+        <div class="top-three-count">${item.count} ${
+      item.count === 1 ? 'оценка' : 'оценок'
+    }</div>
+      </div>
+    `;
+  } else if (type === 'artist') {
+    content = `
+      <div class="top-three-effect ${effect}"></div>
+      <div class="top-three-rank">${emoji}</div>
+      <div class="top-three-content">
+        <div class="top-three-position">#${rank}</div>
+        <h3 class="top-three-title">${item.artist}</h3>
+        <p class="top-three-subtitle">${item.count} ${
+      item.count === 1 ? 'трек' : item.count < 5 ? 'трека' : 'треков'
+    }</p>
+      </div>
+      <div class="top-three-stats">
+        <div class="top-three-rating" style="color: ${getRatingColor(
+          item.avgRating
+        )}">
+          ${item.avgRating.toFixed(1)}
+        </div>
+      </div>
+    `;
+  } else if (type === 'genre') {
+    content = `
+      <div class="top-three-effect ${effect}"></div>
+      <div class="top-three-rank">${emoji}</div>
+      <div class="top-three-content">
+        <div class="top-three-position">#${rank}</div>
+        <h3 class="top-three-title">${item.genre}</h3>
+        <p class="top-three-subtitle">${item.count} ${
+      item.count === 1 ? 'трек' : item.count < 5 ? 'трека' : 'треков'
+    }</p>
+      </div>
+      <div class="top-three-stats">
+        <div class="top-three-rating" style="color: ${getRatingColor(
+          item.avgRating
+        )}">
+          ${item.avgRating.toFixed(1)}
+        </div>
+      </div>
+    `;
+  }
+
+  card.innerHTML = content;
+  card.style.setProperty('--rank-color', color);
+
+  return card;
+}
+
+/**
+ * Creates a table for ratings beyond top 3
+ * @param {Array} items - Rating items
+ * @param {number} startRank - Starting rank number
+ * @param {string} type - Type (track, artist, genre)
+ * @returns {HTMLElement} Table element
+ */
+function createRatingsTable(items, startRank, type) {
+  const table = document.createElement('table');
+  table.className = 'ratings-table';
+
+  let headerHTML = '';
+  if (type === 'track') {
+    headerHTML = `
+      <thead>
+        <tr>
+          <th class="rank-col">#</th>
+          <th class="title-col">Трек</th>
+          <th class="artist-col">Исполнитель</th>
+          <th class="genre-col">Жанр</th>
+          <th class="rating-col">Рейтинг</th>
+          <th class="count-col">Оценок</th>
+        </tr>
+      </thead>
+    `;
+  } else if (type === 'artist') {
+    headerHTML = `
+      <thead>
+        <tr>
+          <th class="rank-col">#</th>
+          <th class="artist-col">Исполнитель</th>
+          <th class="rating-col">Рейтинг</th>
+          <th class="count-col">Треков</th>
+        </tr>
+      </thead>
+    `;
+  } else if (type === 'genre') {
+    headerHTML = `
+      <thead>
+        <tr>
+          <th class="rank-col">#</th>
+          <th class="genre-col">Жанр</th>
+          <th class="rating-col">Рейтинг</th>
+          <th class="count-col">Треков</th>
+        </tr>
+      </thead>
+    `;
+  }
+
+  const tbody = document.createElement('tbody');
+  items.forEach((item, index) => {
+    const row = document.createElement('tr');
+    const rank = startRank + index;
+
+    if (type === 'track') {
+      row.innerHTML = `
+        <td class="rank-col">${rank}</td>
+        <td class="title-col">${item.title}</td>
+        <td class="artist-col">${item.artist}</td>
+        <td class="genre-col">${item.genre || '—'}</td>
+        <td class="rating-col" style="color: ${getRatingColor(
+          item.avgRating
+        )}">${item.avgRating.toFixed(1)}</td>
+        <td class="count-col">${item.count}</td>
+      `;
+    } else if (type === 'artist') {
+      row.innerHTML = `
+        <td class="rank-col">${rank}</td>
+        <td class="artist-col">${item.artist}</td>
+        <td class="rating-col" style="color: ${getRatingColor(
+          item.avgRating
+        )}">${item.avgRating.toFixed(1)}</td>
+        <td class="count-col">${item.count}</td>
+      `;
+    } else if (type === 'genre') {
+      row.innerHTML = `
+        <td class="rank-col">${rank}</td>
+        <td class="genre-col">${item.genre}</td>
+        <td class="rating-col" style="color: ${getRatingColor(
+          item.avgRating
+        )}">${item.avgRating.toFixed(1)}</td>
+        <td class="count-col">${item.count}</td>
+      `;
+    }
+
+    tbody.appendChild(row);
+  });
+
+  table.innerHTML = headerHTML;
+  table.appendChild(tbody);
+
+  return table;
 }
 
 // Функция для получения цвета вайба

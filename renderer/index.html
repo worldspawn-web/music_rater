@@ -232,109 +232,100 @@
       </section>
 
       <section class="tab-content" id="track-ratings">
-        <div class="content-container">
-          <header class="content-header">
-            <h1 class="content-title">Рейтинги треков</h1>
-            <p class="content-subtitle">Ваши любимые композиции</p>
+        <div class="ratings-container">
+          <header class="ratings-header">
+            <h1 class="ratings-title">Рейтинги треков</h1>
+            <p class="ratings-subtitle">Ваши любимые композиции</p>
           </header>
-          <div class="table-wrapper">
-            <table class="data-table">
-              <thead>
-                <tr>
-                  <th class="rank-column">#</th>
-                  <th>Название</th>
-                  <th>Исполнитель</th>
-                  <th class="rating-column">Рейтинг</th>
-                  <th class="count-column">Оценок</th>
-                  <th>Жанр</th>
-                  <th class="vibe-column">Настроение</th>
-                </tr>
-              </thead>
-              <tbody id="track-ratings-tbody"></tbody>
-            </table>
-            <div class="empty-state hidden" id="track-ratings-empty">
-              <svg
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-              >
-                <path
-                  d="M9 18V5l12-2v13M9 13c0 1.657-1.343 3-3 3s-3-1.343-3-3 1.343-3 3-3 3 1.343 3 3z"
-                />
-              </svg>
-              <p>Пока нет оцененных треков</p>
-            </div>
+
+          <!-- Vertical top 3 cards with special effects -->
+          <div class="top-three-container" id="track-top-three">
+            <!-- Will be populated by JS -->
+          </div>
+
+          <!-- Regular table for positions 4-100 -->
+          <div class="ratings-table-wrapper" id="track-ratings-table">
+            <!-- Will be populated by JS -->
+          </div>
+
+          <div class="empty-state hidden" id="track-ratings-empty">
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <path
+                d="M9 18V5l12-2v13M9 13c0 1.657-1.343 3-3 3s-3-1.343-3-3 1.343-3 3-3 3 1.343 3 3z"
+              />
+            </svg>
+            <p>Пока нет оцененных треков</p>
           </div>
         </div>
       </section>
 
       <section class="tab-content" id="artist-ratings">
-        <div class="content-container">
-          <header class="content-header">
-            <h1 class="content-title">Рейтинги исполнителей</h1>
-            <p class="content-subtitle">Ваши любимые артисты</p>
+        <div class="ratings-container">
+          <header class="ratings-header">
+            <h1 class="ratings-title">Рейтинги исполнителей</h1>
+            <p class="ratings-subtitle">Ваши любимые артисты</p>
           </header>
-          <div class="table-wrapper">
-            <table class="data-table">
-              <thead>
-                <tr>
-                  <th class="rank-column">#</th>
-                  <th>Исполнитель</th>
-                  <th class="count-column">Треков</th>
-                  <th class="rating-column">Средний рейтинг</th>
-                </tr>
-              </thead>
-              <tbody id="artist-ratings-tbody"></tbody>
-            </table>
-            <div class="empty-state hidden" id="artist-ratings-empty">
-              <svg
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-              >
-                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-                <circle cx="12" cy="7" r="4" />
-              </svg>
-              <p>Пока нет оцененных исполнителей</p>
-            </div>
+
+          <!-- Vertical top 3 cards -->
+          <div class="top-three-container" id="artist-top-three">
+            <!-- Will be populated by JS -->
+          </div>
+
+          <!-- Regular table for positions 4-100 -->
+          <div class="ratings-table-wrapper" id="artist-ratings-table">
+            <!-- Will be populated by JS -->
+          </div>
+
+          <div class="empty-state hidden" id="artist-ratings-empty">
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+              <circle cx="12" cy="7" r="4" />
+            </svg>
+            <p>Пока нет оцененных исполнителей</p>
           </div>
         </div>
       </section>
 
       <section class="tab-content" id="genre-ratings">
-        <div class="content-container">
-          <header class="content-header">
-            <h1 class="content-title">Рейтинги жанров</h1>
-            <p class="content-subtitle">Ваши любимые жанры</p>
+        <div class="ratings-container">
+          <header class="ratings-header">
+            <h1 class="ratings-title">Рейтинги жанров</h1>
+            <p class="ratings-subtitle">Ваши любимые жанры</p>
           </header>
-          <div class="table-wrapper">
-            <table class="data-table">
-              <thead>
-                <tr>
-                  <th class="rank-column">#</th>
-                  <th>Жанр</th>
-                  <th class="count-column">Треков</th>
-                  <th class="rating-column">Средний рейтинг</th>
-                </tr>
-              </thead>
-              <tbody id="genre-ratings-tbody"></tbody>
-            </table>
-            <div class="empty-state hidden" id="genre-ratings-empty">
-              <svg
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-              >
-                <rect x="3" y="3" width="7" height="7" />
-                <rect x="14" y="3" width="7" height="7" />
-                <rect x="14" y="14" width="7" height="7" />
-                <rect x="3" y="14" width="7" height="7" />
-              </svg>
-              <p>Пока нет оцененных жанров</p>
-            </div>
+
+          <!-- Vertical top 3 cards -->
+          <div class="top-three-container" id="genre-top-three">
+            <!-- Will be populated by JS -->
+          </div>
+
+          <!-- Regular table for positions 4-100 -->
+          <div class="ratings-table-wrapper" id="genre-ratings-table">
+            <!-- Will be populated by JS -->
+          </div>
+
+          <div class="empty-state hidden" id="genre-ratings-empty">
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <rect x="3" y="3" width="7" height="7" />
+              <rect x="14" y="3" width="7" height="7" />
+              <rect x="14" y="14" width="7" height="7" />
+              <rect x="3" y="14" width="7" height="7" />
+            </svg>
+            <p>Пока нет оцененных жанров</p>
           </div>
         </div>
       </section>

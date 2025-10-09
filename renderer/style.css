@@ -1,9 +1,3 @@
-/**
- * Yandex Music Rater - Modern Styles
- * Dark theme with vibrant accents inspired by modern music players
- * @version 2.0.0
- */
-
 /* ============================================================================
    CSS VARIABLES & THEME
    ============================================================================ */
@@ -34,6 +28,11 @@
   --dynamic-color-primary: #ff4444;
   --dynamic-color-secondary: #ff6b6b;
   --dynamic-color-tertiary: #cc3333;
+
+  /* Medal colors */
+  --medal-color-gold: #ffd700;
+  --medal-color-silver: #c0c0c0;
+  --medal-color-bronze: #cd7f32;
 
   /* Spacing */
   --spacing-xs: 0.25rem;
@@ -869,6 +868,601 @@ select {
   font-size: 1rem;
   font-weight: 500;
 }
+
+/* ============================================================================
+   RATINGS CONTAINER - Modern redesign with podium
+   ============================================================================ */
+
+.ratings-container {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: var(--spacing-2xl);
+}
+
+.ratings-header {
+  margin-bottom: var(--spacing-2xl);
+  text-align: center;
+}
+
+.ratings-title {
+  font-size: 2.5rem;
+  font-weight: 700;
+  color: var(--color-text-primary);
+  margin-bottom: var(--spacing-sm);
+  background: var(--color-accent-gradient);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.ratings-subtitle {
+  font-size: 1.125rem;
+  color: var(--color-text-secondary);
+}
+
+/* Podium for top 3 */
+.podium-container {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: var(--spacing-lg);
+  margin-bottom: var(--spacing-2xl);
+  padding: var(--spacing-xl);
+}
+
+.podium-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--spacing-md);
+  padding: var(--spacing-xl);
+  background: rgba(20, 20, 20, 0.6);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border: 2px solid rgba(255, 255, 255, 0.1);
+  border-radius: var(--radius-xl);
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+  transition: all var(--transition-base);
+  position: relative;
+  overflow: hidden;
+}
+
+.podium-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: var(--medal-color);
+  box-shadow: 0 0 20px var(--medal-color);
+}
+
+.podium-card:hover {
+  transform: translateY(-8px);
+  box-shadow: 0 12px 40px 0 rgba(0, 0, 0, 0.5);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.podium-gold {
+  width: 320px;
+  min-height: 280px;
+  order: 2;
+  --medal-color: var(--medal-color-gold);
+}
+
+.podium-silver {
+  width: 280px;
+  min-height: 240px;
+  order: 1;
+  --medal-color: var(--medal-color-silver);
+}
+
+.podium-bronze {
+  width: 280px;
+  min-height: 240px;
+  order: 3;
+  --medal-color: var(--medal-color-bronze);
+}
+
+.podium-rank {
+  font-size: 3rem;
+  line-height: 1;
+  filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.5));
+}
+
+.podium-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--spacing-xs);
+  text-align: center;
+  flex: 1;
+}
+
+.podium-title {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--color-text-primary);
+  margin: 0;
+  line-height: 1.3;
+}
+
+.podium-subtitle {
+  font-size: 0.875rem;
+  color: var(--color-text-secondary);
+  margin: 0;
+}
+
+.podium-genre {
+  display: inline-block;
+  padding: var(--spacing-xs) var(--spacing-sm);
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: var(--radius-full);
+  font-size: 0.75rem;
+  color: var(--color-text-secondary);
+  margin-top: var(--spacing-xs);
+}
+
+.podium-rating {
+  font-size: 2.5rem;
+  font-weight: 700;
+  line-height: 1;
+  text-shadow: 0 2px 10px currentColor;
+}
+
+.podium-count {
+  font-size: 0.875rem;
+  color: var(--color-text-tertiary);
+}
+
+/* Ratings list for items beyond top 3 */
+.ratings-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+  gap: var(--spacing-lg);
+}
+
+.rating-card {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+  padding: var(--spacing-lg);
+  background: rgba(20, 20, 20, 0.6);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 4px 16px 0 rgba(0, 0, 0, 0.3);
+  transition: all var(--transition-base);
+}
+
+.rating-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 24px 0 rgba(0, 0, 0, 0.4);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.rating-card-rank {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--color-text-tertiary);
+  min-width: 50px;
+  text-align: center;
+}
+
+.rating-card-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+  min-width: 0;
+}
+
+.rating-card-title {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--color-text-primary);
+  margin: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.rating-card-subtitle {
+  font-size: 0.875rem;
+  color: var(--color-text-secondary);
+  margin: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.rating-card-genre {
+  display: inline-block;
+  padding: 2px var(--spacing-sm);
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: var(--radius-full);
+  font-size: 0.75rem;
+  color: var(--color-text-secondary);
+  width: fit-content;
+}
+
+.rating-card-stats {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: var(--spacing-xs);
+}
+
+.rating-card-rating {
+  font-size: 1.75rem;
+  font-weight: 700;
+  line-height: 1;
+  text-shadow: 0 2px 8px currentColor;
+}
+
+.rating-card-count {
+  font-size: 0.75rem;
+  color: var(--color-text-tertiary);
+}
+
+/* Responsive adjustments */
+@media (max-width: 1024px) {
+  .podium-container {
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .podium-gold,
+  .podium-silver,
+  .podium-bronze {
+    width: 100%;
+    max-width: 400px;
+    min-height: auto;
+    order: initial;
+  }
+
+  .ratings-list {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ============================================================================
+   TOP THREE CARDS - Vertical layout with special effects
+   ============================================================================ */
+
+.top-three-container {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-lg);
+  margin-bottom: var(--spacing-2xl);
+}
+
+.top-three-card {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-lg);
+  padding: var(--spacing-xl);
+  background: rgba(20, 20, 20, 0.6);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border: 2px solid rgba(255, 255, 255, 0.1);
+  border-radius: var(--radius-xl);
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+  transition: all var(--transition-base);
+  overflow: hidden;
+  min-height: 100px;
+}
+
+.top-three-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: 4px;
+  background: var(--rank-color);
+  box-shadow: 0 0 20px var(--rank-color);
+}
+
+.top-three-card:hover {
+  transform: translateX(8px);
+  box-shadow: 0 12px 40px 0 rgba(0, 0, 0, 0.5);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+/* Animated effects for top 3 */
+.top-three-effect {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  pointer-events: none;
+  opacity: 0.15;
+  z-index: 0;
+}
+
+.top-three-effect.fire {
+  background: radial-gradient(
+    ellipse at 50% 100%,
+    rgba(255, 215, 0, 0.4) 0%,
+    rgba(255, 140, 0, 0.2) 30%,
+    transparent 70%
+  );
+  animation: fireFlicker 2s ease-in-out infinite;
+}
+
+.top-three-effect.ice {
+  background: radial-gradient(
+    ellipse at 50% 50%,
+    rgba(173, 216, 230, 0.3) 0%,
+    rgba(135, 206, 250, 0.2) 40%,
+    transparent 70%
+  );
+  animation: iceShimmer 3s ease-in-out infinite;
+}
+
+.top-three-effect.lightning {
+  background: radial-gradient(
+    ellipse at 30% 30%,
+    rgba(255, 255, 100, 0.3) 0%,
+    rgba(205, 127, 50, 0.2) 40%,
+    transparent 70%
+  );
+  animation: lightningPulse 1.5s ease-in-out infinite;
+}
+
+@keyframes fireFlicker {
+  0%,
+  100% {
+    opacity: 0.15;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.25;
+    transform: scale(1.05);
+  }
+}
+
+@keyframes iceShimmer {
+  0%,
+  100% {
+    opacity: 0.15;
+    filter: brightness(1);
+  }
+  50% {
+    opacity: 0.25;
+    filter: brightness(1.2);
+  }
+}
+
+@keyframes lightningPulse {
+  0%,
+  100% {
+    opacity: 0.15;
+  }
+  10%,
+  30% {
+    opacity: 0.3;
+  }
+  20%,
+  40% {
+    opacity: 0.1;
+  }
+}
+
+.top-three-rank {
+  font-size: 3rem;
+  line-height: 1;
+  filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.5));
+  z-index: 1;
+  flex-shrink: 0;
+}
+
+/* Album cover for top 3 tracks */
+.top-three-cover {
+  width: 80px;
+  height: 80px;
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  background: var(--color-bg-tertiary);
+  flex-shrink: 0;
+  z-index: 1;
+  box-shadow: var(--shadow-md);
+}
+
+.top-three-cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.top-three-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+  min-width: 0;
+  z-index: 1;
+}
+
+.top-three-position {
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: var(--rank-color);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.top-three-title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--color-text-primary);
+  margin: 0;
+  line-height: 1.3;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.top-three-subtitle {
+  font-size: 1rem;
+  color: var(--color-text-secondary);
+  margin: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.top-three-genre {
+  display: inline-block;
+  padding: var(--spacing-xs) var(--spacing-sm);
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: var(--radius-full);
+  font-size: 0.75rem;
+  color: var(--color-text-secondary);
+  width: fit-content;
+}
+
+.top-three-stats {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: var(--spacing-xs);
+  flex-shrink: 0;
+  z-index: 1;
+}
+
+.top-three-rating {
+  font-size: 2.5rem;
+  font-weight: 700;
+  line-height: 1;
+  text-shadow: 0 2px 10px currentColor;
+}
+
+.top-three-count {
+  font-size: 0.875rem;
+  color: var(--color-text-tertiary);
+}
+
+/* ============================================================================
+   RATINGS TABLE - For positions 4-100
+   ============================================================================ */
+
+.ratings-table-wrapper {
+  background: rgba(20, 20, 20, 0.6);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  box-shadow: 0 4px 16px 0 rgba(0, 0, 0, 0.3);
+}
+
+.ratings-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.ratings-table thead {
+  background: rgba(30, 30, 30, 0.8);
+  backdrop-filter: blur(10px);
+}
+
+.ratings-table th {
+  padding: var(--spacing-md) var(--spacing-lg);
+  text-align: left;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.ratings-table td {
+  padding: var(--spacing-md) var(--spacing-lg);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  color: var(--color-text-primary);
+}
+
+.ratings-table tbody tr {
+  transition: background var(--transition-fast);
+}
+
+.ratings-table tbody tr:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.ratings-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+/* Column specific styles */
+.rank-col {
+  width: 60px;
+  text-align: center;
+  color: var(--color-text-tertiary);
+  font-weight: 600;
+}
+
+.title-col {
+  min-width: 200px;
+  font-weight: 500;
+}
+
+.artist-col {
+  min-width: 150px;
+  color: var(--color-text-secondary);
+}
+
+.genre-col {
+  width: 120px;
+  color: var(--color-text-tertiary);
+}
+
+.rating-col {
+  width: 80px;
+  text-align: center;
+  font-weight: 700;
+  font-size: 1.125rem;
+}
+
+.count-col {
+  width: 80px;
+  text-align: center;
+  color: var(--color-text-tertiary);
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .top-three-card {
+    flex-direction: column;
+    text-align: center;
+  }
+
+  .top-three-stats {
+    align-items: center;
+  }
+
+  .ratings-table {
+    font-size: 0.875rem;
+  }
+
+  .ratings-table th,
+  .ratings-table td {
+    padding: var(--spacing-sm) var(--spacing-md);
+  }
+}
+
+/* ============================================================================
+   LEGACY TABLE STYLES - Keeping for backwards compatibility
+   ============================================================================ */
+
+/* Existing code for legacy table styles remains here */
 
 /* ============================================================================
    UTILITY CLASSES
