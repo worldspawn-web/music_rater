@@ -1,148 +1,335 @@
 <!DOCTYPE html>
-<html>
+<html lang="ru">
   <head>
     <meta charset="UTF-8" />
-    <title>Yandex Music Rater</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Music Rater</title>
     <link rel="stylesheet" href="style.css" />
   </head>
   <body>
-    <div class="tabs">
-      <button class="tab-button active" data-tab="current-track">
-        Текущий трек
-      </button>
-      <button class="tab-button" data-tab="track-ratings">
-        Рейтинги треков
-      </button>
-      <button class="tab-button" data-tab="artist-ratings">
-        Рейтинги исполнителей
-      </button>
-      <button class="tab-button" data-tab="genre-ratings">
-        Рейтинги жанров
-      </button>
-    </div>
-
-    <div class="tab-content active" id="current-track">
-      <div class="container">
-        <h1>Текущий трек</h1>
-        <div class="track-header">
-          <div class="album-cover-container">
-            <img
-              id="album-cover"
-              src="/placeholder.svg"
-              alt="Album Cover"
-              style="display: none"
+    Modern navigation with icons and better structure
+    <nav class="navigation">
+      <div class="nav-brand">
+        <svg
+          class="logo-icon"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+        >
+          <path
+            d="M9 18V5l12-2v13M9 13c0 1.657-1.343 3-3 3s-3-1.343-3-3 1.343-3 3-3 3 1.343 3 3z"
+          />
+        </svg>
+        <span class="brand-text">Music Rater</span>
+      </div>
+      <div class="nav-tabs">
+        <button class="nav-tab active" data-tab="current-track">
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+          >
+            <circle cx="12" cy="12" r="10" />
+            <polygon points="10 8 16 12 10 16 10 8" />
+          </svg>
+          <span>Текущий трек</span>
+        </button>
+        <button class="nav-tab" data-tab="track-ratings">
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+          >
+            <path
+              d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"
             />
-            <div id="no-cover" class="no-cover">Нет обложки</div>
-          </div>
-          <div class="track-info">
-            <p>
-              <strong>Название:</strong>
-              <span id="track-title">Загружаю...</span>
-            </p>
-            <p><strong>Артист:</strong> <span id="track-artist"></span></p>
-            <p><strong>Альбом:</strong> <span id="track-album"></span></p>
-          </div>
-        </div>
-        <div class="genre-section">
-          <label for="genre-select">Жанр:</label>
-          <select id="genre-select">
-            <option value="">Выберите жанр</option>
-          </select>
-          <button class="add-genre-button" id="add-genre-button">+</button>
-          <div class="genre-input" id="genre-input" style="display: none">
-            <input type="text" id="new-genre-input" placeholder="Новый жанр" />
-            <button id="save-genre-button">Сохранить</button>
-          </div>
-        </div>
-        <div class="vibe-section">
-          <p><strong>Вайб:</strong></p>
-          <div class="vibe-buttons">
-            <button class="vibe-button" data-vibe="Спокойное">Спокойное</button>
-            <button class="vibe-button" data-vibe="Грустное">Грустное</button>
-            <button class="vibe-button" data-vibe="Веселое">Веселое</button>
-            <button class="add-vibe-button" id="add-vibe-button">+</button>
-          </div>
-          <div class="vibe-input" id="vibe-input" style="display: none">
-            <input
-              type="text"
-              id="new-vibe-name"
-              placeholder="Название вайба"
-            />
-            <input type="color" id="new-vibe-color" value="#aed581" />
-            <button id="save-vibe-button">Сохранить</button>
-          </div>
-        </div>
-        <div class="rating">
-          <h2>Оцените трек (1-10)</h2>
-          <div class="rating-buttons">
-            <button class="rating-button" data-rating="1">1</button>
-            <button class="rating-button" data-rating="2">2</button>
-            <button class="rating-button" data-rating="3">3</button>
-            <button class="rating-button" data-rating="4">4</button>
-            <button class="rating-button" data-rating="5">5</button>
-            <button class="rating-button" data-rating="6">6</button>
-            <button class="rating-button" data-rating="7">7</button>
-            <button class="rating-button" data-rating="8">8</button>
-            <button class="rating-button" data-rating="9">9</button>
-            <button class="rating-button" data-rating="10">10</button>
-          </div>
-        </div>
+          </svg>
+          <span>Треки</span>
+        </button>
+        <button class="nav-tab" data-tab="artist-ratings">
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+          >
+            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+            <circle cx="12" cy="7" r="4" />
+          </svg>
+          <span>Исполнители</span>
+        </button>
+        <button class="nav-tab" data-tab="genre-ratings">
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+          >
+            <rect x="3" y="3" width="7" height="7" />
+            <rect x="14" y="3" width="7" height="7" />
+            <rect x="14" y="14" width="7" height="7" />
+            <rect x="3" y="14" width="7" height="7" />
+          </svg>
+          <span>Жанры</span>
+        </button>
       </div>
-    </div>
+    </nav>
 
-    <div class="tab-content" id="track-ratings">
-      <div class="container">
-        <h1>Рейтинги треков</h1>
-        <table id="track-ratings-table">
-          <thead>
-            <tr>
-              <th>#</th>
-              <th>Название</th>
-              <th>Артист</th>
-              <th>Рейтинг</th>
-              <th>Количество оценок</th>
-              <th>Жанр</th>
-              <th>Вайб</th>
-            </tr>
-          </thead>
-          <tbody></tbody>
-        </table>
-      </div>
-    </div>
+    <main class="main-content">
+      Current Track Tab - Hero layout with album cover
+      <section class="tab-content active" id="current-track">
+        <div class="hero-section">
+          <div class="album-artwork">
+            <div class="artwork-wrapper">
+              <img id="album-cover" class="cover-image" alt="Album Cover" />
+              <div id="no-cover" class="no-cover-placeholder">
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                >
+                  <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                  <circle cx="8.5" cy="8.5" r="1.5" />
+                  <polyline points="21 15 16 10 5 21" />
+                </svg>
+                <span>Нет обложки</span>
+              </div>
+            </div>
+          </div>
 
-    <div class="tab-content" id="artist-ratings">
-      <div class="container">
-        <h1>Рейтинги исполнителей</h1>
-        <table id="artist-ratings-table">
-          <thead>
-            <tr>
-              <th>#</th>
-              <th>Исполнитель</th>
-              <th>Количество песен</th>
-              <th>Средний рейтинг</th>
-            </tr>
-          </thead>
-          <tbody></tbody>
-        </table>
-      </div>
-    </div>
+          <div class="track-details">
+            <div class="track-info">
+              <h1 id="track-title" class="track-title">Загрузка...</h1>
+              <p id="track-artist" class="track-artist"></p>
+              <p id="track-album" class="track-album"></p>
+            </div>
 
-    <div class="tab-content" id="genre-ratings">
-      <div class="container">
-        <h1>Рейтинги жанров</h1>
-        <table id="genre-ratings-table">
-          <thead>
-            <tr>
-              <th>#</th>
-              <th>Жанр</th>
-              <th>Количество песен</th>
-              <th>Средний рейтинг</th>
-            </tr>
-          </thead>
-          <tbody></tbody>
-        </table>
-      </div>
-    </div>
+            <div class="metadata-section">
+              <div class="genre-selector">
+                <label for="genre-select" class="input-label">Жанр</label>
+                <div class="select-group">
+                  <select id="genre-select" class="custom-select">
+                    <option value="">Выберите жанр</option>
+                  </select>
+                  <button
+                    class="icon-button"
+                    id="add-genre-button"
+                    title="Добавить жанр"
+                  >
+                    <svg
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2"
+                    >
+                      <line x1="12" y1="5" x2="12" y2="19" />
+                      <line x1="5" y1="12" x2="19" y2="12" />
+                    </svg>
+                  </button>
+                </div>
+                <div class="input-group hidden" id="genre-input">
+                  <input
+                    type="text"
+                    id="new-genre-input"
+                    class="text-input"
+                    placeholder="Новый жанр"
+                  />
+                  <button id="save-genre-button" class="primary-button">
+                    Сохранить
+                  </button>
+                </div>
+              </div>
+
+              <div class="vibe-selector">
+                <label class="input-label">Настроение</label>
+                <div class="vibe-grid" id="vibe-buttons">
+                  <button
+                    class="vibe-chip"
+                    data-vibe="Спокойное"
+                    style="--vibe-color: #10b981"
+                  >
+                    Спокойное
+                  </button>
+                  <button
+                    class="vibe-chip"
+                    data-vibe="Грустное"
+                    style="--vibe-color: #3b82f6"
+                  >
+                    Грустное
+                  </button>
+                  <button
+                    class="vibe-chip"
+                    data-vibe="Веселое"
+                    style="--vibe-color: #f59e0b"
+                  >
+                    Веселое
+                  </button>
+                  <button class="vibe-chip add-vibe" id="add-vibe-button">
+                    <svg
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2"
+                    >
+                      <line x1="12" y1="5" x2="12" y2="19" />
+                      <line x1="5" y1="12" x2="19" y2="12" />
+                    </svg>
+                  </button>
+                </div>
+                <div class="input-group hidden" id="vibe-input">
+                  <input
+                    type="text"
+                    id="new-vibe-name"
+                    class="text-input"
+                    placeholder="Название"
+                  />
+                  <input
+                    type="color"
+                    id="new-vibe-color"
+                    class="color-input"
+                    value="#10b981"
+                  />
+                  <button id="save-vibe-button" class="primary-button">
+                    Сохранить
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div class="rating-section">
+              <h2 class="section-title">Оцените трек</h2>
+              <div class="rating-grid">
+                <button class="rating-button" data-rating="1">1</button>
+                <button class="rating-button" data-rating="2">2</button>
+                <button class="rating-button" data-rating="3">3</button>
+                <button class="rating-button" data-rating="4">4</button>
+                <button class="rating-button" data-rating="5">5</button>
+                <button class="rating-button" data-rating="6">6</button>
+                <button class="rating-button" data-rating="7">7</button>
+                <button class="rating-button" data-rating="8">8</button>
+                <button class="rating-button" data-rating="9">9</button>
+                <button class="rating-button" data-rating="10">10</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      Track Ratings Tab - Modern table design
+      <section class="tab-content" id="track-ratings">
+        <div class="content-container">
+          <header class="content-header">
+            <h1 class="content-title">Рейтинги треков</h1>
+            <p class="content-subtitle">Ваши любимые композиции</p>
+          </header>
+          <div class="table-wrapper">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th class="rank-column">#</th>
+                  <th>Название</th>
+                  <th>Исполнитель</th>
+                  <th class="rating-column">Рейтинг</th>
+                  <th class="count-column">Оценок</th>
+                  <th>Жанр</th>
+                  <th class="vibe-column">Настроение</th>
+                </tr>
+              </thead>
+              <tbody id="track-ratings-tbody"></tbody>
+            </table>
+            <div class="empty-state hidden" id="track-ratings-empty">
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+              >
+                <path
+                  d="M9 18V5l12-2v13M9 13c0 1.657-1.343 3-3 3s-3-1.343-3-3 1.343-3 3-3 3 1.343 3 3z"
+                />
+              </svg>
+              <p>Пока нет оцененных треков</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      Artist Ratings Tab
+      <section class="tab-content" id="artist-ratings">
+        <div class="content-container">
+          <header class="content-header">
+            <h1 class="content-title">Рейтинги исполнителей</h1>
+            <p class="content-subtitle">Ваши любимые артисты</p>
+          </header>
+          <div class="table-wrapper">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th class="rank-column">#</th>
+                  <th>Исполнитель</th>
+                  <th class="count-column">Треков</th>
+                  <th class="rating-column">Средний рейтинг</th>
+                </tr>
+              </thead>
+              <tbody id="artist-ratings-tbody"></tbody>
+            </table>
+            <div class="empty-state hidden" id="artist-ratings-empty">
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+              >
+                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                <circle cx="12" cy="7" r="4" />
+              </svg>
+              <p>Пока нет оцененных исполнителей</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      Genre Ratings Tab
+      <section class="tab-content" id="genre-ratings">
+        <div class="content-container">
+          <header class="content-header">
+            <h1 class="content-title">Рейтинги жанров</h1>
+            <p class="content-subtitle">Ваши любимые жанры</p>
+          </header>
+          <div class="table-wrapper">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th class="rank-column">#</th>
+                  <th>Жанр</th>
+                  <th class="count-column">Треков</th>
+                  <th class="rating-column">Средний рейтинг</th>
+                </tr>
+              </thead>
+              <tbody id="genre-ratings-tbody"></tbody>
+            </table>
+            <div class="empty-state hidden" id="genre-ratings-empty">
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+              >
+                <rect x="3" y="3" width="7" height="7" />
+                <rect x="14" y="3" width="7" height="7" />
+                <rect x="14" y="14" width="7" height="7" />
+                <rect x="3" y="14" width="7" height="7" />
+              </svg>
+              <p>Пока нет оцененных жанров</p>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
 
     <script src="renderer.js"></script>
   </body>

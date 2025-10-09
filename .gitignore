@@ -16,3 +16,6 @@ logs/
 
 # Packages
 /node_modules
+
+# Other
+covers/
