@@ -298,6 +298,15 @@ document.querySelectorAll('.vibe-chip:not(.add-vibe)').forEach((button) => {
       .forEach((btn) => btn.classList.remove('active'));
     button.classList.add('active');
   });
+
+  // Extract RGB values from color for glassmorphism effect
+  const color = button.style.getPropertyValue('--vibe-color');
+  if (color) {
+    const rgb = color.match(/\d+/g);
+    if (rgb && rgb.length === 3) {
+      button.style.setProperty('--vibe-color-rgb', rgb.join(', '));
+    }
+  }
 });
 
 // Обработчик для кнопки добавления жанра
@@ -368,6 +377,12 @@ function addVibe(name, color) {
   newVibeButton.textContent = name;
   newVibeButton.setAttribute('data-vibe', name);
   newVibeButton.style.setProperty('--vibe-color', color);
+
+  // Extract RGB values for glassmorphism
+  const rgb = color.match(/\d+/g);
+  if (rgb && rgb.length === 3) {
+    newVibeButton.style.setProperty('--vibe-color-rgb', rgb.join(', '));
+  }
 
   newVibeButton.addEventListener('click', () => {
     document
@@ -527,18 +542,22 @@ function getRatingColor(rating) {
  */
 function animateRatingChange(element, oldRating, newRating) {
   const delta = newRating - oldRating;
+  const ratingSpan = element.querySelector('.artist-rating');
+
+  if (!ratingSpan) return;
+
   const deltaElement = document.createElement('span');
   deltaElement.className = 'rating-delta';
   deltaElement.textContent =
     delta > 0 ? `+${delta.toFixed(2)}` : delta.toFixed(2);
   deltaElement.style.color = delta > 0 ? '#10b981' : '#ef4444';
 
-  element.appendChild(deltaElement);
+  ratingSpan.appendChild(deltaElement);
 
   // Animate delta
   setTimeout(() => {
     deltaElement.style.opacity = '0';
-    deltaElement.style.transform = 'translateY(-20px)';
+    deltaElement.style.transform = 'translateY(-10px)';
   }, 100);
 
   // Remove delta and update rating

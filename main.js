@@ -182,7 +182,7 @@ class CoverService {
     if (!artworkData) return null;
 
     try {
-      const filename = `${sanitizeFilename(album)}.jpg`;
+      const filename = `${sanitizeFilename(album)}.png`;
       const coverPath = path.join(__dirname, CONSTANTS.PATHS.COVERS, filename);
 
       // Check if cover already exists
