@@ -10,8 +10,8 @@ const fsSync = require('fs');
 
 const CONSTANTS = {
   WINDOW: {
-    WIDTH: 1000,
-    HEIGHT: 700,
+    WIDTH: 1280,
+    HEIGHT: 720,
     MIN_WIDTH: 800,
     MIN_HEIGHT: 600,
   },
