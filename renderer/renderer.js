@@ -34,20 +34,18 @@ function extractColorsFromImage(img) {
   const canvas = document.createElement('canvas');
   const ctx = canvas.getContext('2d');
 
-  // Use smaller canvas for performance
-  canvas.width = 100;
-  canvas.height = 100;
+  canvas.width = 200;
+  canvas.height = 200;
 
-  ctx.drawImage(img, 0, 0, 100, 100);
+  ctx.drawImage(img, 0, 0, 200, 200);
 
   try {
-    const imageData = ctx.getImageData(0, 0, 100, 100);
+    const imageData = ctx.getImageData(0, 0, 200, 200);
     const data = imageData.data;
     const colorMap = new Map();
 
-    // Sample colors and count occurrences
-    for (let i = 0; i < data.length; i += 4 * 10) {
-      // Sample every 10th pixel
+    for (let i = 0; i < data.length; i += 4 * 4) {
+      // Sample every 4th pixel instead of 10th
       const r = data[i];
       const g = data[i + 1];
       const b = data[i + 2];
@@ -62,19 +60,17 @@ function extractColorsFromImage(img) {
         continue;
       }
 
-      // Quantize colors to reduce variations
-      const qr = Math.round(r / 32) * 32;
-      const qg = Math.round(g / 32) * 32;
-      const qb = Math.round(b / 32) * 32;
+      const qr = Math.round(r / 16) * 16;
+      const qg = Math.round(g / 16) * 16;
+      const qb = Math.round(b / 16) * 16;
       const key = `${qr},${qg},${qb}`;
 
       colorMap.set(key, (colorMap.get(key) || 0) + 1);
     }
 
-    // Sort by frequency and get top colors
     const sortedColors = Array.from(colorMap.entries())
       .sort((a, b) => b[1] - a[1])
-      .slice(0, 5)
+      .slice(0, 10)
       .map((entry) => entry[0]);
 
     if (sortedColors.length === 0) {
@@ -85,10 +81,19 @@ function extractColorsFromImage(img) {
       };
     }
 
-    // Convert to RGB strings
     const primary = `rgb(${sortedColors[0]})`;
-    const secondary = sortedColors[1] ? `rgb(${sortedColors[1]})` : primary;
-    const tertiary = sortedColors[2] ? `rgb(${sortedColors[2]})` : primary;
+    const secondary = sortedColors[2]
+      ? `rgb(${sortedColors[2]})`
+      : sortedColors[1]
+      ? `rgb(${sortedColors[1]})`
+      : primary;
+    const tertiary = sortedColors[4]
+      ? `rgb(${sortedColors[4]})`
+      : sortedColors[1]
+      ? `rgb(${sortedColors[1]})`
+      : primary;
+
+    console.log('[v0] Extracted colors:', { primary, secondary, tertiary });
 
     return { primary, secondary, tertiary };
   } catch (error) {
@@ -186,6 +191,7 @@ function resetRatingButtons() {
   document.querySelectorAll('.rating-button').forEach((button) => {
     button.style.backgroundColor = '';
     button.disabled = false;
+    button.classList.remove('rated'); // Ensure rated class is removed on reset
   });
 }
 
@@ -194,9 +200,8 @@ function blockRatingButtons(rating) {
   document.querySelectorAll('.rating-button').forEach((button) => {
     const buttonRating = Number.parseInt(button.getAttribute('data-rating'));
     if (buttonRating === rating) {
-      button.style.backgroundColor = '#4CAF50';
+      button.classList.add('rated');
     } else {
-      button.style.backgroundColor = '#cccccc';
       button.disabled = true;
     }
   });

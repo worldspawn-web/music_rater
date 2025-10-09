@@ -140,7 +140,9 @@ class NowPlayingService {
    */
   static async getArtworkData() {
     try {
-      const artworkData = await execPromise('nowplaying-cli get artworkData');
+      const artworkData = await execPromise(
+        'nowplaying-cli get artworkData --width 1000 --height 1000'
+      );
 
       if (!artworkData || artworkData === 'null' || artworkData === '') {
         return null;
@@ -149,7 +151,16 @@ class NowPlayingService {
       return artworkData;
     } catch (error) {
       console.warn('Error getting artwork:', error.message);
-      return null;
+      try {
+        const fallbackData = await execPromise(
+          'nowplaying-cli get artworkData'
+        );
+        return fallbackData && fallbackData !== 'null' && fallbackData !== ''
+          ? fallbackData
+          : null;
+      } catch (fallbackError) {
+        return null;
+      }
     }
   }
 }
