@@ -695,6 +695,25 @@ select {
   border-color: rgba(255, 255, 255, 0.05);
 }
 
+/* Artist Rating Animation */
+.artist-rating {
+  display: inline-block;
+  transition: color 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+}
+
+.rating-delta {
+  position: absolute;
+  left: 100%;
+  margin-left: 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  opacity: 1;
+  transform: translateY(0);
+  transition: all 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+  pointer-events: none;
+}
+
 /* ============================================================================
    CONTENT CONTAINER - RATINGS TABLES
    ============================================================================ */

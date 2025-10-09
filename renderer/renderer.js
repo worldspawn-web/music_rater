@@ -147,9 +147,10 @@ async function fetchCurrentTrack() {
     );
 
     if (artistRating) {
+      const ratingColor = getRatingColor(artistRating.avgRating);
       artistElement.innerHTML = `${
         trackInfo.artist
-      } <span style="color: var(--color-accent-primary); font-weight: 700; margin-left: 0.5rem;">${artistRating.avgRating.toFixed(
+      } <span class="artist-rating" style="color: ${ratingColor}; font-weight: 700; margin-left: 0.5rem;">${artistRating.avgRating.toFixed(
         1
       )}</span>`;
     } else {
@@ -227,7 +228,10 @@ document.querySelectorAll('.rating-button').forEach((button) => {
   button.addEventListener('click', async () => {
     const rating = Number.parseInt(button.getAttribute('data-rating'));
     const trackTitle = document.getElementById('track-title').textContent;
-    const trackArtist = document.getElementById('track-artist').textContent;
+    const trackArtistElement = document.getElementById('track-artist');
+    const trackArtist =
+      trackArtistElement.textContent.split(' ').slice(0, -1).join(' ').trim() ||
+      trackArtistElement.textContent;
     const trackAlbum = document.getElementById('track-album').textContent;
     const genre = document.getElementById('genre-select').value;
     const vibeButton = document.querySelector('.vibe-chip.active');
@@ -252,6 +256,31 @@ document.querySelectorAll('.rating-button').forEach((button) => {
         addGenreToStorage(genre);
         loadGenres();
         document.getElementById('genre-select').value = genre;
+
+        const artistRatings = await ipcRenderer.invoke('getArtistRatings');
+        const artistRating = artistRatings.find(
+          (r) => r.artist === trackArtist
+        );
+        if (artistRating) {
+          const oldRatingElement =
+            trackArtistElement.querySelector('.artist-rating');
+          const oldRating = oldRatingElement
+            ? Number.parseFloat(oldRatingElement.textContent)
+            : 0;
+
+          if (oldRating > 0 && oldRating !== artistRating.avgRating) {
+            animateRatingChange(
+              trackArtistElement,
+              oldRating,
+              artistRating.avgRating
+            );
+          } else {
+            const ratingColor = getRatingColor(artistRating.avgRating);
+            trackArtistElement.innerHTML = `${trackArtist} <span class="artist-rating" style="color: ${ratingColor}; font-weight: 700; margin-left: 0.5rem;">${artistRating.avgRating.toFixed(
+              1
+            )}</span>`;
+          }
+        }
       } else {
         alert(result.message);
       }
@@ -468,6 +497,93 @@ function getVibeColor(vibe) {
     Веселое: '#ffd54f',
   };
   return vibeColors[vibe] || '#e0e0e0';
+}
+
+// Функция для получения цвета рейтинга на основе значения
+/**
+ * Gets color for rating based on value
+ * @param {number} rating - Rating value
+ * @returns {string} CSS color value
+ */
+function getRatingColor(rating) {
+  if (rating < 5.5) {
+    // Red for poor ratings
+    return '#ef4444';
+  } else if (rating >= 5.5 && rating <= 7.0) {
+    // Gray for average ratings
+    return '#9ca3af';
+  } else {
+    // Green for good ratings
+    return '#10b981';
+  }
+}
+
+// Функция для анимации изменения рейтинга с отображением дельты
+/**
+ * Animates rating change with delta display
+ * @param {HTMLElement} element - Element to animate
+ * @param {number} oldRating - Previous rating
+ * @param {number} newRating - New rating
+ */
+function animateRatingChange(element, oldRating, newRating) {
+  const delta = newRating - oldRating;
+  const deltaElement = document.createElement('span');
+  deltaElement.className = 'rating-delta';
+  deltaElement.textContent =
+    delta > 0 ? `+${delta.toFixed(2)}` : delta.toFixed(2);
+  deltaElement.style.color = delta > 0 ? '#10b981' : '#ef4444';
+
+  element.appendChild(deltaElement);
+
+  // Animate delta
+  setTimeout(() => {
+    deltaElement.style.opacity = '0';
+    deltaElement.style.transform = 'translateY(-20px)';
+  }, 100);
+
+  // Remove delta and update rating
+  setTimeout(() => {
+    deltaElement.remove();
+    animateNumber(element, oldRating, newRating);
+  }, 1000);
+}
+
+/**
+ * Animates number change with smooth transition
+ * @param {HTMLElement} element - Element containing the number
+ * @param {number} start - Start value
+ * @param {number} end - End value
+ */
+function animateNumber(element, start, end) {
+  const duration = 800;
+  const startTime = performance.now();
+  const startColor = getRatingColor(start);
+  const endColor = getRatingColor(end);
+
+  function update(currentTime) {
+    const elapsed = currentTime - startTime;
+    const progress = Math.min(elapsed / duration, 1);
+
+    // Easing function (ease-out)
+    const eased = 1 - Math.pow(1 - progress, 3);
+
+    const current = start + (end - start) * eased;
+    const ratingSpan = element.querySelector('.artist-rating');
+    if (ratingSpan) {
+      ratingSpan.textContent = current.toFixed(1);
+
+      // Interpolate color if rating crosses thresholds
+      if (startColor !== endColor) {
+        ratingSpan.style.color = progress < 0.5 ? startColor : endColor;
+      }
+    }
+
+    if (progress < 1) {
+      requestAnimationFrame(update);
+    }
+  }
+
+  requestAnimationFrame(update);
 }
 
 // Обновляем информацию о треке каждые 5 секунд
