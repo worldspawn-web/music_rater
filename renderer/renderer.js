@@ -1,10 +1,10 @@
 const { ipcRenderer } = require('electron');
 
 // Переключение вкладок
-document.querySelectorAll('.tab-button').forEach((button) => {
+document.querySelectorAll('.nav-tab').forEach((button) => {
   button.addEventListener('click', () => {
     document
-      .querySelectorAll('.tab-button')
+      .querySelectorAll('.nav-tab')
       .forEach((btn) => btn.classList.remove('active'));
     document
       .querySelectorAll('.tab-content')
@@ -102,7 +102,7 @@ document.querySelectorAll('.rating-button').forEach((button) => {
     const trackArtist = document.getElementById('track-artist').textContent;
     const trackAlbum = document.getElementById('track-album').textContent;
     const genre = document.getElementById('genre-select').value;
-    const vibeButton = document.querySelector('.vibe-button.active');
+    const vibeButton = document.querySelector('.vibe-chip.active');
     const vibe = vibeButton ? vibeButton.getAttribute('data-vibe') : null;
 
     const trackInfo = {
@@ -134,20 +134,19 @@ document.querySelectorAll('.rating-button').forEach((button) => {
 });
 
 // Обработчик для кнопок вайбов
-document
-  .querySelectorAll('.vibe-button:not(.add-vibe-button)')
-  .forEach((button) => {
-    button.addEventListener('click', () => {
-      document
-        .querySelectorAll('.vibe-button:not(.add-vibe-button)')
-        .forEach((btn) => btn.classList.remove('active'));
-      button.classList.add('active');
-    });
+document.querySelectorAll('.vibe-chip:not(.add-vibe)').forEach((button) => {
+  button.addEventListener('click', () => {
+    document
+      .querySelectorAll('.vibe-chip:not(.add-vibe)')
+      .forEach((btn) => btn.classList.remove('active'));
+    button.classList.add('active');
   });
+});
 
 // Обработчик для кнопки добавления жанра
 document.getElementById('add-genre-button').addEventListener('click', () => {
-  document.getElementById('genre-input').style.display = 'flex';
+  const genreInput = document.getElementById('genre-input');
+  genreInput.classList.toggle('hidden');
 });
 
 // Обработчик для кнопки сохранения нового жанра
@@ -158,7 +157,7 @@ document.getElementById('save-genre-button').addEventListener('click', () => {
     loadGenres();
     document.getElementById('genre-select').value = newGenre;
     document.getElementById('new-genre-input').value = '';
-    document.getElementById('genre-input').style.display = 'none';
+    document.getElementById('genre-input').classList.add('hidden');
   }
 });
 
@@ -186,7 +185,8 @@ function loadGenres() {
 
 // Обработчик для кнопки добавления вайба
 document.getElementById('add-vibe-button').addEventListener('click', () => {
-  document.getElementById('vibe-input').style.display = 'flex';
+  const vibeInput = document.getElementById('vibe-input');
+  vibeInput.classList.toggle('hidden');
 });
 
 // Обработчик для кнопки сохранения нового вайба
@@ -197,52 +197,67 @@ document.getElementById('save-vibe-button').addEventListener('click', () => {
   if (newVibeName) {
     addVibe(newVibeName, newVibeColor);
     document.getElementById('new-vibe-name').value = '';
-    document.getElementById('vibe-input').style.display = 'none';
+    document.getElementById('vibe-input').classList.add('hidden');
   }
 });
 
 // Функция для добавления нового вайба
 function addVibe(name, color) {
-  const vibeButtons = document.querySelector('.vibe-buttons');
+  const vibeGrid = document.getElementById('vibe-buttons');
+  const addButton = document.getElementById('add-vibe-button');
+
   const newVibeButton = document.createElement('button');
-  newVibeButton.className = 'vibe-button';
+  newVibeButton.className = 'vibe-chip';
   newVibeButton.textContent = name;
   newVibeButton.setAttribute('data-vibe', name);
-  newVibeButton.style.backgroundColor = color;
+  newVibeButton.style.setProperty('--vibe-color', color);
+
   newVibeButton.addEventListener('click', () => {
     document
-      .querySelectorAll('.vibe-button:not(.add-vibe-button)')
+      .querySelectorAll('.vibe-chip:not(.add-vibe)')
       .forEach((btn) => btn.classList.remove('active'));
     newVibeButton.classList.add('active');
   });
-  vibeButtons.insertBefore(
-    newVibeButton,
-    document.getElementById('add-vibe-button')
-  );
+
+  vibeGrid.insertBefore(newVibeButton, addButton);
 }
 
 // Загрузка рейтингов треков
 async function loadTrackRatings() {
   try {
     const ratings = await ipcRenderer.invoke('getTrackRatings');
-    const tableBody = document.querySelector('#track-ratings-table tbody');
+    const tableBody = document.getElementById('track-ratings-tbody');
+    const emptyState = document.getElementById('track-ratings-empty');
+
     tableBody.innerHTML = '';
+
+    if (ratings.length === 0) {
+      emptyState.classList.remove('hidden');
+      return;
+    }
+
+    emptyState.classList.add('hidden');
 
     ratings.forEach((rating, index) => {
       const row = document.createElement('tr');
-      if (index < 3) {
-        row.classList.add('top-three');
-      }
       row.innerHTML = `
-        <td>${index + 1}</td>
-        <td>${rating.title}</td>
+        <td class="rank-cell">${index + 1}</td>
+        <td class="title-cell">${rating.title}</td>
         <td>${rating.artist}</td>
-        <td>${rating.avgRating.toFixed(2)}</td>
-        <td>${rating.count}</td>
-        <td>${rating.genre || ''}</td>
-        <td><div class="vibe-indicator" style="background-color: ${getVibeColor(
-          rating.vibe
-        )};"></div></td>
+        <td class="rating-cell">
+          <span class="rating-badge">${rating.avgRating.toFixed(1)}</span>
+        </td>
+        <td class="count-cell">${rating.count}</td>
+        <td>${rating.genre || '—'}</td>
+        <td class="vibe-cell">
+          ${
+            rating.vibe
+              ? `<span class="vibe-badge" style="--vibe-color: ${getVibeColor(
+                  rating.vibe
+                )}">${rating.vibe}</span>`
+              : '—'
+          }
+        </td>
       `;
       tableBody.appendChild(row);
     });
@@ -255,19 +270,27 @@ async function loadTrackRatings() {
 async function loadArtistRatings() {
   try {
     const ratings = await ipcRenderer.invoke('getArtistRatings');
-    const tableBody = document.querySelector('#artist-ratings-table tbody');
+    const tableBody = document.getElementById('artist-ratings-tbody');
+    const emptyState = document.getElementById('artist-ratings-empty');
+
     tableBody.innerHTML = '';
+
+    if (ratings.length === 0) {
+      emptyState.classList.remove('hidden');
+      return;
+    }
+
+    emptyState.classList.add('hidden');
 
     ratings.forEach((rating, index) => {
       const row = document.createElement('tr');
-      if (index < 3) {
-        row.classList.add('top-three');
-      }
       row.innerHTML = `
-        <td>${index + 1}</td>
-        <td>${rating.artist}</td>
-        <td>${rating.count}</td>
-        <td>${rating.avgRating.toFixed(2)}</td>
+        <td class="rank-cell">${index + 1}</td>
+        <td class="title-cell">${rating.artist}</td>
+        <td class="count-cell">${rating.count}</td>
+        <td class="rating-cell">
+          <span class="rating-badge">${rating.avgRating.toFixed(1)}</span>
+        </td>
       `;
       tableBody.appendChild(row);
     });
@@ -280,19 +303,27 @@ async function loadArtistRatings() {
 async function loadGenreRatings() {
   try {
     const ratings = await ipcRenderer.invoke('getGenreRatings');
-    const tableBody = document.querySelector('#genre-ratings-table tbody');
+    const tableBody = document.getElementById('genre-ratings-tbody');
+    const emptyState = document.getElementById('genre-ratings-empty');
+
     tableBody.innerHTML = '';
+
+    if (ratings.length === 0) {
+      emptyState.classList.remove('hidden');
+      return;
+    }
+
+    emptyState.classList.add('hidden');
 
     ratings.forEach((rating, index) => {
       const row = document.createElement('tr');
-      if (index < 3) {
-        row.classList.add('top-three');
-      }
       row.innerHTML = `
-        <td>${index + 1}</td>
-        <td>${rating.genre}</td>
-        <td>${rating.count}</td>
-        <td>${rating.avgRating.toFixed(2)}</td>
+        <td class="rank-cell">${index + 1}</td>
+        <td class="title-cell">${rating.genre}</td>
+        <td class="count-cell">${rating.count}</td>
+        <td class="rating-cell">
+          <span class="rating-badge">${rating.avgRating.toFixed(1)}</span>
+        </td>
       `;
       tableBody.appendChild(row);
     });
