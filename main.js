@@ -195,7 +195,9 @@ class CoverService {
       const buffer = Buffer.from(base64Data, 'base64');
 
       await fs.writeFile(coverPath, buffer);
-      console.log(`Saved cover: ${filename}`);
+      console.log(
+        `Saved cover: ${filename} (${(buffer.length / 1024).toFixed(2)} KB)`
+      );
 
       return `${CONSTANTS.PATHS.COVERS}/${filename}`;
     } catch (error) {
