@@ -226,10 +226,16 @@ class CoverService {
 class RatingService {
   /**
    * Gets all ratings from storage
-   * @returns {Promise<Array>} Array of ratings
+   * @returns {Promise<Object>} Ratings object with tracks array
    */
   static async getAllRatings() {
-    return await readJsonFile(CONSTANTS.PATHS.RATINGS, []);
+    const data = await readJsonFile(CONSTANTS.PATHS.RATINGS, { tracks: [] });
+    // Ensure proper structure
+    if (Array.isArray(data)) {
+      // Old format - convert to new format
+      return { tracks: [] };
+    }
+    return data;
   }
 
   /**
@@ -238,17 +244,26 @@ class RatingService {
    * @returns {Promise<Object|null>} Last rating or null
    */
   static async getLastRating(trackInfo) {
-    const ratings = await this.getAllRatings();
+    const data = await this.getAllRatings();
     const cooldownTime = Date.now() - CONSTANTS.RATING.COOLDOWN_MS;
 
-    return (
-      ratings.find(
-        (r) =>
-          r.title === trackInfo.title &&
-          r.artist === trackInfo.artist &&
-          new Date(r.timestamp).getTime() > cooldownTime
-      ) || null
+    const track = data.tracks.find(
+      (t) => t.title === trackInfo.title && t.artist === trackInfo.artist
     );
+
+    if (!track || track.ratings.length === 0) {
+      return null;
+    }
+
+    const lastRating = track.ratings[track.ratings.length - 1];
+    if (new Date(lastRating.timestamp).getTime() > cooldownTime) {
+      return {
+        rating: lastRating.rating,
+        timestamp: lastRating.timestamp,
+      };
+    }
+
+    return null;
   }
 
   /**
@@ -270,21 +285,41 @@ class RatingService {
       return { success: false, message: 'Этот трек уже был оценён недавно' };
     }
 
-    // Create rating object
-    const ratingData = {
-      title: trackInfo.title,
-      artist: trackInfo.artist,
-      album: trackInfo.album,
+    const data = await this.getAllRatings();
+
+    // Find existing track or create new one
+    let track = data.tracks.find(
+      (t) => t.title === trackInfo.title && t.artist === trackInfo.artist
+    );
+
+    const newRating = {
       rating: ratingNum,
-      genre: trackInfo.genre || null,
-      vibe: trackInfo.vibe || null,
+      vibes: trackInfo.vibe ? [trackInfo.vibe] : [],
       timestamp: new Date().toISOString(),
     };
 
-    // Save to file
-    const ratings = await this.getAllRatings();
-    ratings.push(ratingData);
-    await writeJsonFile(CONSTANTS.PATHS.RATINGS, ratings);
+    if (track) {
+      // Add rating to existing track
+      track.ratings.push(newRating);
+      // Update genre if provided
+      if (trackInfo.genre) {
+        track.genre = trackInfo.genre;
+      }
+    } else {
+      // Create new track entry
+      track = {
+        title: trackInfo.title,
+        artist: trackInfo.artist,
+        album: trackInfo.album,
+        genre: trackInfo.genre || null,
+        ratings: [newRating],
+        flag: null,
+        favorite: false,
+      };
+      data.tracks.push(track);
+    }
+
+    await writeJsonFile(CONSTANTS.PATHS.RATINGS, data);
 
     console.log(`Saved rating: ${trackInfo.title} - ${ratingNum}/10`);
     return { success: true };
@@ -295,40 +330,25 @@ class RatingService {
    * @returns {Promise<Array>} Array of track ratings with averages
    */
   static async getTrackRatings() {
-    const ratings = await this.getAllRatings();
-    const trackMap = new Map();
+    const data = await this.getAllRatings();
 
-    // Aggregate ratings by track
-    ratings.forEach((rating) => {
-      const key = `${rating.title}|||${rating.artist}`;
+    return data.tracks
+      .map((track) => {
+        const totalRating = track.ratings.reduce((sum, r) => sum + r.rating, 0);
+        const avgRating = totalRating / track.ratings.length;
 
-      if (!trackMap.has(key)) {
-        trackMap.set(key, {
-          title: rating.title,
-          artist: rating.artist,
-          album: rating.album,
-          ratings: [],
-          genre: rating.genre,
-          vibe: rating.vibe,
-        });
-      }
-
-      trackMap.get(key).ratings.push(rating.rating);
-    });
-
-    // Calculate averages and sort
-    return Array.from(trackMap.values())
-      .map((track) => ({
-        title: track.title,
-        artist: track.artist,
-        album: track.album,
-        avgRating:
-          track.ratings.reduce((sum, r) => sum + r, 0) / track.ratings.length,
-        count: track.ratings.length,
-        genre: track.genre,
-        vibe: track.vibe,
-        coverPath: `covers/${sanitizeFilename(track.album)}.png`,
-      }))
+        return {
+          title: track.title,
+          artist: track.artist,
+          album: track.album,
+          avgRating,
+          count: track.ratings.length,
+          genre: track.genre,
+          flag: track.flag,
+          favorite: track.favorite,
+          coverPath: `covers/${sanitizeFilename(track.album)}.png`,
+        };
+      })
       .sort((a, b) => b.avgRating - a.avgRating || b.count - a.count);
   }
 
@@ -337,19 +357,20 @@ class RatingService {
    * @returns {Promise<Array>} Array of artist ratings with averages
    */
   static async getArtistRatings() {
-    const ratings = await this.getAllRatings();
+    const data = await this.getAllRatings();
     const artistMap = new Map();
 
-    // Aggregate ratings by artist
-    ratings.forEach((rating) => {
-      if (!artistMap.has(rating.artist)) {
-        artistMap.set(rating.artist, {
-          artist: rating.artist,
+    data.tracks.forEach((track) => {
+      if (!artistMap.has(track.artist)) {
+        artistMap.set(track.artist, {
+          artist: track.artist,
           ratings: [],
         });
       }
 
-      artistMap.get(rating.artist).ratings.push(rating.rating);
+      track.ratings.forEach((rating) => {
+        artistMap.get(track.artist).ratings.push(rating.rating);
+      });
     });
 
     // Calculate averages and sort
@@ -368,21 +389,22 @@ class RatingService {
    * @returns {Promise<Array>} Array of genre ratings with averages
    */
   static async getGenreRatings() {
-    const ratings = await this.getAllRatings();
+    const data = await this.getAllRatings();
     const genreMap = new Map();
 
-    // Aggregate ratings by genre
-    ratings.forEach((rating) => {
-      if (!rating.genre) return;
+    data.tracks.forEach((track) => {
+      if (!track.genre) return;
 
-      if (!genreMap.has(rating.genre)) {
-        genreMap.set(rating.genre, {
-          genre: rating.genre,
+      if (!genreMap.has(track.genre)) {
+        genreMap.set(track.genre, {
+          genre: track.genre,
           ratings: [],
         });
       }
 
-      genreMap.get(rating.genre).ratings.push(rating.rating);
+      track.ratings.forEach((rating) => {
+        genreMap.get(track.genre).ratings.push(rating.rating);
+      });
     });
 
     // Calculate averages and sort
