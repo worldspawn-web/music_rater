@@ -36,6 +36,18 @@ async function fetchCurrentTrack() {
     document.getElementById('track-artist').textContent = trackInfo.artist;
     document.getElementById('track-album').textContent = trackInfo.album;
 
+    const albumCover = document.getElementById('album-cover');
+    const noCover = document.getElementById('no-cover');
+
+    if (trackInfo.coverPath) {
+      albumCover.src = '../' + trackInfo.coverPath;
+      albumCover.style.display = 'block';
+      noCover.style.display = 'none';
+    } else {
+      albumCover.style.display = 'none';
+      noCover.style.display = 'flex';
+    }
+
     // Сбрасываем состояние кнопок рейтинга при смене трека
     if (
       currentTrackInfo &&
@@ -72,7 +84,7 @@ function resetRatingButtons() {
 // Блокировка кнопок рейтинга
 function blockRatingButtons(rating) {
   document.querySelectorAll('.rating-button').forEach((button) => {
-    const buttonRating = parseInt(button.getAttribute('data-rating'));
+    const buttonRating = Number.parseInt(button.getAttribute('data-rating'));
     if (buttonRating === rating) {
       button.style.backgroundColor = '#4CAF50';
     } else {
@@ -85,7 +97,7 @@ function blockRatingButtons(rating) {
 // Обработчик для кнопок рейтинга
 document.querySelectorAll('.rating-button').forEach((button) => {
   button.addEventListener('click', async () => {
-    const rating = parseInt(button.getAttribute('data-rating'));
+    const rating = Number.parseInt(button.getAttribute('data-rating'));
     const trackTitle = document.getElementById('track-title').textContent;
     const trackArtist = document.getElementById('track-artist').textContent;
     const trackAlbum = document.getElementById('track-album').textContent;
@@ -152,7 +164,7 @@ document.getElementById('save-genre-button').addEventListener('click', () => {
 
 // Функция для добавления жанра в localStorage
 function addGenreToStorage(genre) {
-  let genres = JSON.parse(localStorage.getItem('genres') || '[]');
+  const genres = JSON.parse(localStorage.getItem('genres') || '[]');
   if (!genres.includes(genre)) {
     genres.push(genre);
     localStorage.setItem('genres', JSON.stringify(genres));

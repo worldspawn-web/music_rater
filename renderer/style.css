@@ -40,8 +40,42 @@ body {
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
-.track-info {
+/* Added styles for album cover display */
+.track-header {
+  display: flex;
+  gap: 20px;
   margin: 20px 0;
+  align-items: flex-start;
+}
+
+.album-cover-container {
+  flex-shrink: 0;
+}
+
+#album-cover {
+  width: 150px;
+  height: 150px;
+  object-fit: cover;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+.no-cover {
+  width: 150px;
+  height: 150px;
+  background-color: #e0e0e0;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #999;
+  font-size: 14px;
+  text-align: center;
+}
+
+.track-info {
+  flex: 1;
+  margin: 0;
 }
 
 .rating-buttons {

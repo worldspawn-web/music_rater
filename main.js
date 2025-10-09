@@ -5,6 +5,11 @@ const fs = require('fs');
 
 let mainWindow;
 
+const coversDir = path.join(__dirname, 'covers');
+if (!fs.existsSync(coversDir)) {
+  fs.mkdirSync(coversDir);
+}
+
 function createWindow() {
   mainWindow = new BrowserWindow({
     width: 800,
@@ -16,6 +21,10 @@ function createWindow() {
   });
 
   mainWindow.loadFile('renderer/index.html');
+}
+
+function sanitizeFilename(str) {
+  return str.replace(/[^a-z0-9]/gi, '_').toLowerCase();
 }
 
 ipcMain.handle('getCurrentTrack', async () => {
@@ -30,7 +39,49 @@ ipcMain.handle('getCurrentTrack', async () => {
         return;
       }
       const [title, album, artist] = stdout.trim().split('\n');
-      resolve({ title, album, artist });
+
+      exec(
+        'nowplaying-cli get artworkData',
+        (artError, artStdout, artStderr) => {
+          let coverPath = null;
+
+          if (!artError && artStdout) {
+            const artworkData = artStdout.trim();
+
+            if (artworkData && artworkData !== 'null') {
+              // Generate unique filename based on artist and title
+              const filename = `${sanitizeFilename(artist)}_${sanitizeFilename(
+                title
+              )}.jpg`;
+              coverPath = path.join(coversDir, filename);
+
+              // Save artwork if it doesn't exist
+              if (!fs.existsSync(coverPath)) {
+                try {
+                  // Remove data:image prefix if present
+                  const base64Data = artworkData.replace(
+                    /^data:image\/\w+;base64,/,
+                    ''
+                  );
+                  const buffer = Buffer.from(base64Data, 'base64');
+                  fs.writeFileSync(coverPath, buffer);
+                  console.log(`Saved cover: ${filename}`);
+                } catch (saveError) {
+                  console.error('Error saving artwork:', saveError);
+                  coverPath = null;
+                }
+              }
+            }
+          }
+
+          resolve({
+            title,
+            album,
+            artist,
+            coverPath: coverPath ? `covers/${path.basename(coverPath)}` : null,
+          });
+        }
+      );
     });
   });
 });
@@ -56,7 +107,7 @@ ipcMain.handle('saveRating', async (event, { trackInfo, rating }) => {
     title: trackInfo.title,
     artist: trackInfo.artist,
     album: trackInfo.album,
-    rating: parseInt(rating),
+    rating: Number.parseInt(rating),
     genre: trackInfo.genre,
     vibe: trackInfo.vibe,
     timestamp: new Date().toISOString(),

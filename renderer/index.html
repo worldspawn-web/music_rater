@@ -24,12 +24,24 @@
     <div class="tab-content active" id="current-track">
       <div class="container">
         <h1>Текущий трек</h1>
-        <div class="track-info">
-          <p>
-            <strong>Название:</strong> <span id="track-title">Загружаю...</span>
-          </p>
-          <p><strong>Артист:</strong> <span id="track-artist"></span></p>
-          <p><strong>Альбом:</strong> <span id="track-album"></span></p>
+        <div class="track-header">
+          <div class="album-cover-container">
+            <img
+              id="album-cover"
+              src="/placeholder.svg"
+              alt="Album Cover"
+              style="display: none"
+            />
+            <div id="no-cover" class="no-cover">Нет обложки</div>
+          </div>
+          <div class="track-info">
+            <p>
+              <strong>Название:</strong>
+              <span id="track-title">Загружаю...</span>
+            </p>
+            <p><strong>Артист:</strong> <span id="track-artist"></span></p>
+            <p><strong>Альбом:</strong> <span id="track-album"></span></p>
+          </div>
         </div>
         <div class="genre-section">
           <label for="genre-select">Жанр:</label>
