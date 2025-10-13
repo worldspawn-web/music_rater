@@ -122,37 +122,101 @@
             <div class="metadata-section glass-card">
               <div class="genre-selector">
                 <label for="genre-select" class="input-label">Жанр</label>
-                <div class="select-group">
-                  <select id="genre-select" class="custom-select">
-                    <option value="">Выберите жанр</option>
-                  </select>
-                  <button
-                    class="icon-button"
-                    id="add-genre-button"
-                    title="Добавить жанр"
-                  >
+                <!-- Replaced native select with custom genre dropdown -->
+                <div class="custom-genre-dropdown" id="genre-dropdown">
+                  <button class="genre-trigger" id="genre-trigger">
+                    <span class="genre-trigger-text" id="genre-trigger-text"
+                      >Выберите жанр</span
+                    >
                     <svg
+                      class="genre-trigger-icon"
                       viewBox="0 0 24 24"
                       fill="none"
                       stroke="currentColor"
                       stroke-width="2"
                     >
-                      <line x1="12" y1="5" x2="12" y2="19" />
-                      <line x1="5" y1="12" x2="19" y2="12" />
+                      <polyline points="6 9 12 15 18 9"></polyline>
                     </svg>
                   </button>
+
+                  <div class="genre-dropdown-panel hidden" id="genre-panel">
+                    <div class="genre-search-wrapper">
+                      <svg
+                        class="genre-search-icon"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2"
+                      >
+                        <circle cx="11" cy="11" r="8"></circle>
+                        <path d="m21 21-4.35-4.35"></path>
+                      </svg>
+                      <input
+                        type="text"
+                        class="genre-search-input"
+                        id="genre-search"
+                        placeholder="Поиск жанра..."
+                      />
+                    </div>
+
+                    <div class="genre-sort-buttons">
+                      <button class="genre-sort-btn active" data-sort="count">
+                        <svg
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          stroke-width="2"
+                        >
+                          <path d="M3 6h18M7 12h10M11 18h2"></path>
+                        </svg>
+                        По популярности
+                      </button>
+                      <button class="genre-sort-btn" data-sort="alpha">
+                        <svg
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          stroke-width="2"
+                        >
+                          <path d="M4 6h16M4 12h13M4 18h10"></path>
+                        </svg>
+                        По алфавиту
+                      </button>
+                    </div>
+
+                    <div class="genre-list" id="genre-list">
+                      <!-- Will be populated by JS -->
+                    </div>
+
+                    <div class="genre-add-section">
+                      <button class="genre-add-btn" id="genre-add-btn">
+                        <svg
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          stroke-width="2"
+                        >
+                          <line x1="12" y1="5" x2="12" y2="19"></line>
+                          <line x1="5" y1="12" x2="19" y2="12"></line>
+                        </svg>
+                        Добавить новый жанр
+                      </button>
+                      <div class="genre-add-input hidden" id="genre-add-input">
+                        <input
+                          type="text"
+                          class="text-input"
+                          id="new-genre-name"
+                          placeholder="Название жанра"
+                        />
+                        <button class="primary-button" id="save-new-genre">
+                          Сохранить
+                        </button>
+                      </div>
+                    </div>
+                  </div>
                 </div>
-                <div class="input-group hidden" id="genre-input">
-                  <input
-                    type="text"
-                    id="new-genre-input"
-                    class="text-input"
-                    placeholder="Новый жанр"
-                  />
-                  <button id="save-genre-button" class="primary-button">
-                    Сохранить
-                  </button>
-                </div>
+                <!-- Hidden input to store selected genre value -->
+                <input type="hidden" id="genre-select" value="" />
               </div>
 
               <div class="vibe-selector">

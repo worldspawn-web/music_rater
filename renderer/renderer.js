@@ -267,7 +267,7 @@ document.querySelectorAll('.rating-button').forEach((button) => {
         currentRating = rating;
         blockRatingButtons(rating);
         addGenreToStorage(genre);
-        loadGenres();
+        loadGenreDropdown(); // Call loadGenreDropdown to update genre list
         document.getElementById('genre-select').value = genre;
 
         const artistRatings = await ipcRenderer.invoke('getArtistRatings');
@@ -324,46 +324,6 @@ document.querySelectorAll('.vibe-chip:not(.add-vibe)').forEach((button) => {
     }
   }
 });
-
-// Обработчик для кнопки добавления жанра
-document.getElementById('add-genre-button').addEventListener('click', () => {
-  const genreInput = document.getElementById('genre-input');
-  genreInput.classList.toggle('hidden');
-});
-
-// Обработчик для кнопки сохранения нового жанра
-document.getElementById('save-genre-button').addEventListener('click', () => {
-  const newGenre = document.getElementById('new-genre-input').value;
-  if (newGenre) {
-    addGenreToStorage(newGenre);
-    loadGenres();
-    document.getElementById('genre-select').value = newGenre;
-    document.getElementById('new-genre-input').value = '';
-    document.getElementById('genre-input').classList.add('hidden');
-  }
-});
-
-// Функция для добавления жанра в localStorage
-function addGenreToStorage(genre) {
-  const genres = JSON.parse(localStorage.getItem('genres') || '[]');
-  if (!genres.includes(genre)) {
-    genres.push(genre);
-    localStorage.setItem('genres', JSON.stringify(genres));
-  }
-}
-
-// Загрузка жанров в выпадающий список
-function loadGenres() {
-  const genres = JSON.parse(localStorage.getItem('genres') || '[]');
-  const genreSelect = document.getElementById('genre-select');
-  genreSelect.innerHTML = '<option value="">Выберите жанр</option>';
-  genres.forEach((genre) => {
-    const option = document.createElement('option');
-    option.value = genre;
-    option.textContent = genre;
-    genreSelect.appendChild(option);
-  });
-}
 
 // Обработчик для кнопки добавления вайба
 document.getElementById('add-vibe-button').addEventListener('click', () => {
@@ -585,11 +545,11 @@ async function createTopThreeCard(item, rank, type) {
           ${item.artist}
           ${
             artistRating
-              ? `<span style="color: ${getRatingColor(
+              ? `<span class="artist-rating" style="color: ${getRatingColor(
                   artistRating.avgRating
                 )}; font-weight: 600; margin-left: 0.5rem;">${artistRating.avgRating.toFixed(
                   1
-                )}</span> <span style="color: var(--color-text-tertiary); font-size: 0.75rem;">(#${artistRank})</span>`
+                )}</span> <span class="artist-ranking" style="color: var(--color-text-tertiary); font-size: 0.75rem;">(#${artistRank})</span>`
               : ''
           }
         </p>
@@ -597,11 +557,11 @@ async function createTopThreeCard(item, rank, type) {
           item.genre
             ? `<span class="top-three-genre">${item.genre}${
                 genreRating
-                  ? ` <span style="color: ${getRatingColor(
+                  ? ` <span class="genre-rating" style="color: ${getRatingColor(
                       genreRating.avgRating
                     )}; font-weight: 600;">${genreRating.avgRating.toFixed(
                       1
-                    )}</span> <span style="color: var(--color-text-tertiary); font-size: 0.75rem;">(#${genreRank})</span>`
+                    )}</span> <span class="genre-ranking" style="color: var(--color-text-tertiary); font-size: 0.75rem;">(#${genreRank})</span>`
                   : ''
               }</span>`
             : ''
@@ -864,6 +824,244 @@ setInterval(fetchCurrentTrack, 5000);
 
 // Инициализация
 document.addEventListener('DOMContentLoaded', () => {
-  loadGenres();
   fetchCurrentTrack();
 });
+
+let currentGenreSort = 'count'; // 'count' or 'alpha'
+let selectedGenre = '';
+
+// Toggle genre dropdown
+document.getElementById('genre-trigger').addEventListener('click', (e) => {
+  e.stopPropagation();
+  const panel = document.getElementById('genre-panel');
+  const isHidden = panel.classList.contains('hidden');
+
+  if (isHidden) {
+    panel.classList.remove('hidden');
+    loadGenreDropdown();
+  } else {
+    panel.classList.add('hidden');
+  }
+});
+
+// Close dropdown when clicking outside
+document.addEventListener('click', (e) => {
+  const dropdown = document.getElementById('genre-dropdown');
+  const panel = document.getElementById('genre-panel');
+
+  if (!dropdown.contains(e.target) && !panel.classList.contains('hidden')) {
+    panel.classList.add('hidden');
+  }
+});
+
+// Genre search
+document.getElementById('genre-search').addEventListener('input', (e) => {
+  loadGenreDropdown(e.target.value);
+});
+
+// Genre sort buttons
+document.querySelectorAll('.genre-sort-btn').forEach((btn) => {
+  btn.addEventListener('click', () => {
+    document
+      .querySelectorAll('.genre-sort-btn')
+      .forEach((b) => b.classList.remove('active'));
+    btn.classList.add('active');
+    currentGenreSort = btn.getAttribute('data-sort');
+    loadGenreDropdown(document.getElementById('genre-search').value);
+  });
+});
+
+// Add new genre button
+document.getElementById('genre-add-btn').addEventListener('click', () => {
+  const input = document.getElementById('genre-add-input');
+  input.classList.toggle('hidden');
+});
+
+// Save new genre
+document.getElementById('save-new-genre').addEventListener('click', () => {
+  const newGenre = document.getElementById('new-genre-name').value.trim();
+  if (newGenre) {
+    addGenreToStorage(newGenre);
+    selectGenre(newGenre);
+    document.getElementById('new-genre-name').value = '';
+    document.getElementById('genre-add-input').classList.add('hidden');
+    loadGenreDropdown(); // Call loadGenreDropdown to update genre list
+  }
+});
+
+// Load and display genres in dropdown
+async function loadGenreDropdown(searchQuery = '') {
+  const genreList = document.getElementById('genre-list');
+  genreList.innerHTML = '';
+
+  // Get all genres from storage
+  const storedGenres = JSON.parse(localStorage.getItem('genres') || '[]');
+
+  // Get genre ratings to show stats
+  const genreRatings = await ipcRenderer.invoke('getGenreRatings');
+
+  // Get suggested genre based on current artist
+  let suggestedGenre = null;
+  if (currentTrackInfo && currentTrackInfo.artist) {
+    const trackRatings = await ipcRenderer.invoke('getTrackRatings');
+    const artistTracks = trackRatings.filter(
+      (t) => t.artist === currentTrackInfo.artist && t.genre
+    );
+
+    if (artistTracks.length > 0) {
+      // Find most common genre for this artist
+      const genreCounts = {};
+      artistTracks.forEach((t) => {
+        genreCounts[t.genre] = (genreCounts[t.genre] || 0) + 1;
+      });
+      suggestedGenre = Object.keys(genreCounts).reduce((a, b) =>
+        genreCounts[a] > genreCounts[b] ? a : b
+      );
+    }
+  }
+
+  // Combine stored genres with genres from ratings
+  const allGenres = new Set([
+    ...storedGenres,
+    ...genreRatings.map((g) => g.genre),
+  ]);
+
+  // Create genre objects with stats
+  let genres = Array.from(allGenres).map((genre) => {
+    const rating = genreRatings.find((g) => g.genre === genre);
+    return {
+      name: genre,
+      rating: rating ? rating.avgRating : null,
+      count: rating ? rating.count : 0,
+      rank: rating
+        ? genreRatings.findIndex((g) => g.genre === genre) + 1
+        : null,
+    };
+  });
+
+  // Filter by search query
+  if (searchQuery) {
+    genres = genres.filter((g) =>
+      g.name.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+  }
+
+  // Sort genres
+  if (currentGenreSort === 'count') {
+    genres.sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
+  } else {
+    genres.sort((a, b) => a.name.localeCompare(b.name));
+  }
+
+  // Show suggested genre first if exists
+  if (suggestedGenre && !searchQuery) {
+    const suggested = genres.find((g) => g.name === suggestedGenre);
+    if (suggested) {
+      genres = genres.filter((g) => g.name !== suggestedGenre);
+
+      const suggestedItem = createGenreItem(suggested, true);
+      genreList.appendChild(suggestedItem);
+
+      // Add divider
+      const divider = document.createElement('div');
+      divider.className = 'genre-divider';
+      genreList.appendChild(divider);
+    }
+  }
+
+  // Show all genres
+  if (genres.length === 0) {
+    const emptyState = document.createElement('div');
+    emptyState.className = 'genre-empty';
+    emptyState.textContent = searchQuery ? 'Жанр не найден' : 'Нет жанров';
+    genreList.appendChild(emptyState);
+  } else {
+    genres.forEach((genre) => {
+      const item = createGenreItem(genre, false);
+      genreList.appendChild(item);
+    });
+  }
+}
+
+// Create genre item element
+function createGenreItem(genre, isSuggested) {
+  const item = document.createElement('button');
+  item.className = 'genre-item';
+  if (isSuggested) {
+    item.classList.add('suggested');
+  }
+  if (selectedGenre === genre.name) {
+    item.classList.add('selected');
+  }
+
+  let content = `
+    <div class="genre-item-content">
+      <div class="genre-item-name">
+        ${genre.name}
+        ${
+          isSuggested
+            ? '<span class="genre-suggested-badge">Предложено</span>'
+            : ''
+        }
+      </div>
+      ${
+        genre.count > 0
+          ? `<div class="genre-item-count">${genre.count} ${
+              genre.count === 1 ? 'трек' : genre.count < 5 ? 'трека' : 'треков'
+            }</div>`
+          : ''
+      }
+    </div>
+  `;
+
+  if (genre.rating !== null) {
+    content += `
+      <div class="genre-item-stats">
+        <div class="genre-item-rating" style="color: ${getRatingColor(
+          genre.rating
+        )}">
+          ${genre.rating.toFixed(1)}
+        </div>
+        ${genre.rank ? `<div class="genre-item-rank">#${genre.rank}</div>` : ''}
+      </div>
+    `;
+  }
+
+  item.innerHTML = content;
+
+  item.addEventListener('click', () => {
+    selectGenre(genre.name);
+  });
+
+  return item;
+}
+
+// Select genre
+function selectGenre(genre) {
+  selectedGenre = genre;
+  document.getElementById('genre-select').value = genre;
+  document.getElementById('genre-trigger-text').textContent = genre;
+  document.getElementById('genre-panel').classList.add('hidden');
+
+  // Update selected state in list
+  document.querySelectorAll('.genre-item').forEach((item) => {
+    item.classList.remove('selected');
+  });
+  const selectedItem = Array.from(
+    document.querySelectorAll('.genre-item')
+  ).find((item) =>
+    item.querySelector('.genre-item-name').textContent.includes(genre)
+  );
+  if (selectedItem) {
+    selectedItem.classList.add('selected');
+  }
+}
+
+// Функция для добавления жанра в localStorage
+function addGenreToStorage(genre) {
+  const genres = JSON.parse(localStorage.getItem('genres') || '[]');
+  if (!genres.includes(genre)) {
+    genres.push(genre);
+    localStorage.setItem('genres', JSON.stringify(genres));
+  }
+}
