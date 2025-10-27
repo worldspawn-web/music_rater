@@ -834,23 +834,33 @@ let selectedGenre = '';
 document.getElementById('genre-trigger').addEventListener('click', (e) => {
   e.stopPropagation();
   const panel = document.getElementById('genre-panel');
+  const backdrop = document.getElementById('genre-backdrop');
   const isHidden = panel.classList.contains('hidden');
 
   if (isHidden) {
+    backdrop.classList.remove('hidden');
     panel.classList.remove('hidden');
     loadGenreDropdown();
   } else {
+    backdrop.classList.add('hidden');
     panel.classList.add('hidden');
   }
+});
+
+document.getElementById('genre-backdrop').addEventListener('click', () => {
+  document.getElementById('genre-panel').classList.add('hidden');
+  document.getElementById('genre-backdrop').classList.add('hidden');
 });
 
 // Close dropdown when clicking outside
 document.addEventListener('click', (e) => {
   const dropdown = document.getElementById('genre-dropdown');
   const panel = document.getElementById('genre-panel');
+  const backdrop = document.getElementById('genre-backdrop');
 
   if (!dropdown.contains(e.target) && !panel.classList.contains('hidden')) {
     panel.classList.add('hidden');
+    backdrop.classList.add('hidden');
   }
 });
 
@@ -1042,6 +1052,7 @@ function selectGenre(genre) {
   document.getElementById('genre-select').value = genre;
   document.getElementById('genre-trigger-text').textContent = genre;
   document.getElementById('genre-panel').classList.add('hidden');
+  document.getElementById('genre-backdrop').classList.add('hidden');
 
   // Update selected state in list
   document.querySelectorAll('.genre-item').forEach((item) => {
