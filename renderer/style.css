@@ -1564,6 +1564,8 @@ select {
 
 .genre-dropdown-panel {
   position: fixed;
+  width: 400px;
+  min-width: 300px;
   max-height: 400px;
   background: rgba(20, 20, 20, 0.95);
   backdrop-filter: blur(20px) saturate(180%);
@@ -1575,7 +1577,7 @@ select {
   display: flex;
   flex-direction: column;
   animation: slideDownFade var(--transition-base);
-  /* Will be positioned via JavaScript */
+  /* Positioned via JavaScript relative to trigger button */
 }
 
 .genre-dropdown-panel.hidden {

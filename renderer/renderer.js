@@ -835,11 +835,44 @@ document.getElementById('genre-trigger').addEventListener('click', (e) => {
   e.stopPropagation();
   const panel = document.getElementById('genre-panel');
   const backdrop = document.getElementById('genre-backdrop');
+  const trigger = document.getElementById('genre-trigger');
   const isHidden = panel.classList.contains('hidden');
 
   if (isHidden) {
     backdrop.classList.remove('hidden');
     panel.classList.remove('hidden');
+
+    // Position the panel relative to the trigger button
+    const triggerRect = trigger.getBoundingClientRect();
+    const panelWidth = 400; // Fixed width for the panel
+    const panelHeight = 400; // Max height
+    const spacing = 8; // Spacing between trigger and panel
+
+    // Calculate position - center horizontally relative to trigger, below it
+    let left = triggerRect.left + triggerRect.width / 2 - panelWidth / 2;
+    let top = triggerRect.bottom + spacing;
+
+    // Ensure panel doesn't go off-screen to the left
+    if (left < 16) {
+      left = 16;
+    }
+
+    // Ensure panel doesn't go off-screen to the right
+    if (left + panelWidth > window.innerWidth - 16) {
+      left = window.innerWidth - panelWidth - 16;
+    }
+
+    // If panel would go off-screen at bottom, show it above the trigger instead
+    if (top + panelHeight > window.innerHeight - 16) {
+      top = triggerRect.top - panelHeight - spacing;
+    }
+
+    // Apply positioning
+    panel.style.position = 'fixed';
+    panel.style.top = `${top}px`;
+    panel.style.left = `${left}px`;
+    panel.style.width = `${panelWidth}px`;
+
     loadGenreDropdown();
   } else {
     backdrop.classList.add('hidden');
