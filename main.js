@@ -451,6 +451,58 @@ class CoverService {
  */
 class RatingService {
   /**
+   * Calculates Bayesian weighted rating (trustworthy rating system)
+   * This balances the item's average rating with the number of ratings
+   * Items with more ratings are more trustworthy and maintain their true average
+   * Items with fewer ratings are pulled toward the global average
+   *
+   * Formula: weightedRating = (v / (v + m)) * R + (m / (v + m)) * C
+   * Where:
+   * - v = number of ratings for the item
+   * - m = minimum ratings threshold (confidence requirement)
+   * - R = average rating for the item
+   * - C = global average rating across all items
+   *
+   * @param {number} avgRating - Average rating for the item
+   * @param {number} count - Number of ratings for the item
+   * @param {number} globalAvg - Global average rating across all items
+   * @param {number} minRatings - Minimum ratings threshold (default: 3)
+   * @returns {number} Weighted rating score
+   */
+  static calculateWeightedRating(avgRating, count, globalAvg, minRatings = 3) {
+    if (count === 0) return 0;
+
+    // Bayesian average formula
+    const weight = count / (count + minRatings);
+    const weightedRating = weight * avgRating + (1 - weight) * globalAvg;
+
+    return weightedRating;
+  }
+
+  /**
+   * Calculates global average rating across all items
+   * @param {Array} items - Array of items with ratings arrays
+   * @returns {number} Global average rating
+   */
+  static calculateGlobalAverage(items) {
+    if (!items || items.length === 0) return 5.5; // Default to middle of 1-10 scale
+
+    let totalSum = 0;
+    let totalCount = 0;
+
+    items.forEach((item) => {
+      if (item.ratings && item.ratings.length > 0) {
+        item.ratings.forEach((rating) => {
+          totalSum += rating.rating || rating;
+          totalCount += 1;
+        });
+      }
+    });
+
+    return totalCount > 0 ? totalSum / totalCount : 5.5;
+  }
+
+  /**
    * Gets all ratings from storage
    * @returns {Promise<Object>} Ratings object with tracks array
    */
@@ -552,35 +604,55 @@ class RatingService {
   }
 
   /**
-   * Gets aggregated track ratings
-   * @returns {Promise<Array>} Array of track ratings with averages
+   * Gets aggregated track ratings with Bayesian weighted scoring
+   * @returns {Promise<Array>} Array of track ratings with weighted averages
    */
   static async getTrackRatings() {
     const data = await this.getAllRatings();
 
-    return data.tracks
-      .map((track) => {
-        const totalRating = track.ratings.reduce((sum, r) => sum + r.rating, 0);
-        const avgRating = totalRating / track.ratings.length;
+    // Calculate global average across all tracks
+    const globalAvg = this.calculateGlobalAverage(data.tracks);
+    const minRatings = 3; // Minimum ratings for trustworthy score
 
-        return {
-          title: track.title,
-          artist: track.artist,
-          album: track.album,
-          avgRating,
-          count: track.ratings.length,
-          genre: track.genre,
-          flag: track.flag,
-          favorite: track.favorite,
-          coverPath: `covers/${sanitizeFilename(track.album)}.png`,
-        };
-      })
-      .sort((a, b) => b.avgRating - a.avgRating || b.count - a.count);
+    const tracks = data.tracks.map((track) => {
+      const totalRating = track.ratings.reduce((sum, r) => sum + r.rating, 0);
+      const avgRating = totalRating / track.ratings.length;
+      const count = track.ratings.length;
+
+      // Calculate weighted rating (trustworthy score)
+      const weightedRating = this.calculateWeightedRating(
+        avgRating,
+        count,
+        globalAvg,
+        minRatings
+      );
+
+      return {
+        title: track.title,
+        artist: track.artist,
+        album: track.album,
+        avgRating, // Keep original average for display
+        weightedRating, // Use this for sorting (more trustworthy)
+        count,
+        genre: track.genre,
+        flag: track.flag,
+        favorite: track.favorite,
+        coverPath: `covers/${sanitizeFilename(track.album)}.png`,
+      };
+    });
+
+    // Sort by weighted rating (trustworthy score), then by count, then by avgRating
+    return tracks.sort(
+      (a, b) =>
+        b.weightedRating - a.weightedRating ||
+        b.count - a.count ||
+        b.avgRating - a.avgRating
+    );
   }
 
   /**
-   * Gets aggregated artist ratings
-   * @returns {Promise<Array>} Array of artist ratings with averages
+   * Gets aggregated artist ratings with Bayesian weighted scoring
+   * @returns {Promise<Array>} Array of artist ratings with weighted averages
    */
   static async getArtistRatings() {
     const data = await this.getAllRatings();
@@ -599,20 +671,46 @@ class RatingService {
       });
     });
 
-    // Calculate averages and sort
-    return Array.from(artistMap.values())
-      .map((artist) => ({
+    const artists = Array.from(artistMap.values());
+
+    // Calculate global average across all artists
+    const globalAvg = this.calculateGlobalAverage(artists);
+    const minRatings = 3; // Minimum ratings for trustworthy score
+
+    // Calculate averages and weighted ratings
+    const artistRatings = artists.map((artist) => {
+      const avgRating =
+        artist.ratings.reduce((sum, r) => sum + r, 0) / artist.ratings.length;
+      const count = artist.ratings.length;
+
+      // Calculate weighted rating (trustworthy score)
+      const weightedRating = this.calculateWeightedRating(
+        avgRating,
+        count,
+        globalAvg,
+        minRatings
+      );
+
+      return {
         artist: artist.artist,
-        avgRating:
-          artist.ratings.reduce((sum, r) => sum + r, 0) / artist.ratings.length,
-        count: artist.ratings.length,
-      }))
-      .sort((a, b) => b.avgRating - a.avgRating || b.count - a.count);
+        avgRating, // Keep original average for display
+        weightedRating, // Use this for sorting (more trustworthy)
+        count,
+      };
+    });
+
+    // Sort by weighted rating (trustworthy score), then by count, then by avgRating
+    return artistRatings.sort(
+      (a, b) =>
+        b.weightedRating - a.weightedRating ||
+        b.count - a.count ||
+        b.avgRating - a.avgRating
+    );
   }
 
   /**
-   * Gets aggregated genre ratings
-   * @returns {Promise<Array>} Array of genre ratings with averages
+   * Gets aggregated genre ratings with Bayesian weighted scoring
+   * @returns {Promise<Array>} Array of genre ratings with weighted averages
    */
   static async getGenreRatings() {
     const data = await this.getAllRatings();
@@ -633,15 +731,41 @@ class RatingService {
       });
     });
 
-    // Calculate averages and sort
-    return Array.from(genreMap.values())
-      .map((genre) => ({
+    const genres = Array.from(genreMap.values());
+
+    // Calculate global average across all genres
+    const globalAvg = this.calculateGlobalAverage(genres);
+    const minRatings = 3; // Minimum ratings for trustworthy score
+
+    // Calculate averages and weighted ratings
+    const genreRatings = genres.map((genre) => {
+      const avgRating =
+        genre.ratings.reduce((sum, r) => sum + r, 0) / genre.ratings.length;
+      const count = genre.ratings.length;
+
+      // Calculate weighted rating (trustworthy score)
+      const weightedRating = this.calculateWeightedRating(
+        avgRating,
+        count,
+        globalAvg,
+        minRatings
+      );
+
+      return {
         genre: genre.genre,
-        avgRating:
-          genre.ratings.reduce((sum, r) => sum + r, 0) / genre.ratings.length,
-        count: genre.ratings.length,
-      }))
-      .sort((a, b) => b.avgRating - a.avgRating || b.count - a.count);
+        avgRating, // Keep original average for display
+        weightedRating, // Use this for sorting (more trustworthy)
+        count,
+      };
+    });
+
+    // Sort by weighted rating (trustworthy score), then by count, then by avgRating
+    return genreRatings.sort(
+      (a, b) =>
+        b.weightedRating - a.weightedRating ||
+        b.count - a.count ||
+        b.avgRating - a.avgRating
+    );
   }
 }
 
