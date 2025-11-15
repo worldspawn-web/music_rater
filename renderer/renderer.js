@@ -519,12 +519,18 @@ async function createTopThreeCard(item, rank, type) {
     const artistRank =
       artistRatings.findIndex((r) => r.artist === item.artist) + 1;
 
+    // Find genre rating and calculate rank
+    // Note: genreRatings is already sorted by weighted rating from backend
     const genreRating = item.genre
       ? genreRatings.find((r) => r.genre === item.genre)
       : null;
-    const genreRank = item.genre
-      ? genreRatings.findIndex((r) => r.genre === item.genre) + 1
-      : null;
+
+    // Calculate rank - genreRatings array is already sorted by weighted rating
+    // so findIndex gives us the correct position
+    const genreRank =
+      item.genre && genreRating
+        ? genreRatings.findIndex((r) => r.genre === item.genre) + 1
+        : null;
 
     const coverPath = item.coverPath
       ? `../${item.coverPath}?t=${Date.now()}`
