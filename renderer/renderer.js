@@ -891,7 +891,12 @@ document.addEventListener('click', (e) => {
   const panel = document.getElementById('genre-panel');
   const backdrop = document.getElementById('genre-backdrop');
 
-  if (!dropdown.contains(e.target) && !panel.classList.contains('hidden')) {
+  // Only close if click is outside both the dropdown trigger AND the panel
+  if (
+    !dropdown.contains(e.target) &&
+    !panel.contains(e.target) &&
+    !panel.classList.contains('hidden')
+  ) {
     panel.classList.add('hidden');
     backdrop.classList.add('hidden');
   }
@@ -904,7 +909,8 @@ document.getElementById('genre-search').addEventListener('input', (e) => {
 
 // Genre sort buttons
 document.querySelectorAll('.genre-sort-btn').forEach((btn) => {
-  btn.addEventListener('click', () => {
+  btn.addEventListener('click', (e) => {
+    e.stopPropagation(); // Prevent closing modal
     document
       .querySelectorAll('.genre-sort-btn')
       .forEach((b) => b.classList.remove('active'));
@@ -915,13 +921,15 @@ document.querySelectorAll('.genre-sort-btn').forEach((btn) => {
 });
 
 // Add new genre button
-document.getElementById('genre-add-btn').addEventListener('click', () => {
+document.getElementById('genre-add-btn').addEventListener('click', (e) => {
+  e.stopPropagation(); // Prevent closing modal
   const input = document.getElementById('genre-add-input');
   input.classList.toggle('hidden');
 });
 
 // Save new genre
-document.getElementById('save-new-genre').addEventListener('click', () => {
+document.getElementById('save-new-genre').addEventListener('click', (e) => {
+  e.stopPropagation(); // Prevent closing modal
   const newGenre = document.getElementById('new-genre-name').value.trim();
   if (newGenre) {
     addGenreToStorage(newGenre);
