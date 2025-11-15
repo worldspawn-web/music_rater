@@ -1,8 +1,13 @@
+// Load environment variables first
+require('dotenv').config();
+
 const { app, BrowserWindow, ipcMain } = require('electron');
 const { exec } = require('child_process');
 const path = require('path');
 const fs = require('fs').promises;
 const fsSync = require('fs');
+const https = require('https');
+const http = require('http');
 
 // ============================================================================
 // CONSTANTS
@@ -143,21 +148,219 @@ class NowPlayingService {
   }
 
   /**
-   * Gets artwork data for current track
+   * Fetches high-resolution artwork from Last.fm API
+   * @param {string} artist - Artist name
+   * @param {string} album - Album name
    * @returns {Promise<string|null>} Base64 artwork data or null
    */
-  static async getArtworkData() {
+  static async fetchHighResArtwork(artist, album) {
+    if (!artist || !album) {
+      console.log(
+        `Skipping Last.fm lookup: artist="${artist}", album="${album}"`
+      );
+      return null;
+    }
+
     try {
+      // Last.fm API endpoint for album info
+      const apiKey = process.env.LASTFM_API_KEY;
+      if (!apiKey) {
+        console.log(
+          '⚠️ LASTFM_API_KEY not found in .env file, skipping Last.fm lookup'
+        );
+        return null;
+      }
+      const encodedArtist = encodeURIComponent(artist);
+      const encodedAlbum = encodeURIComponent(album);
+      const url = `https://ws.audioscrobbler.com/2.0/?method=album.getinfo&api_key=${apiKey}&artist=${encodedArtist}&album=${encodedAlbum}&format=json`;
+
+      console.log(`🔍 Fetching artwork from Last.fm for: ${artist} - ${album}`);
+
+      return new Promise((resolve) => {
+        const req = https.get(url, (res) => {
+          let data = '';
+
+          res.on('data', (chunk) => {
+            data += chunk;
+          });
+
+          res.on('end', async () => {
+            try {
+              // Check for HTTP errors
+              if (res.statusCode !== 200) {
+                console.log(
+                  `Last.fm API returned status ${
+                    res.statusCode
+                  }: ${data.substring(0, 200)}`
+                );
+                resolve(null);
+                return;
+              }
+
+              const json = JSON.parse(data);
+
+              // Check for Last.fm API errors
+              if (json.error) {
+                console.log(`Last.fm API error: ${json.message || json.error}`);
+                resolve(null);
+                return;
+              }
+
+              // Last.fm returns images in different sizes, we want the largest (extralarge or mega)
+              const images = json?.album?.image || [];
+
+              if (!images || images.length === 0) {
+                console.log('No images found in Last.fm response');
+                resolve(null);
+                return;
+              }
+
+              let imageUrl = null;
+
+              // Try to get the largest available image
+              for (const size of ['mega', 'extralarge', 'large', 'medium']) {
+                const img = images.find((i) => i.size === size);
+                if (img && img['#text'] && img['#text'].trim() !== '') {
+                  imageUrl = img['#text'].trim();
+                  console.log(
+                    `Found ${size} image: ${imageUrl.substring(0, 80)}...`
+                  );
+                  break;
+                }
+              }
+
+              if (!imageUrl) {
+                console.log('No valid image URL found in Last.fm response');
+                resolve(null);
+                return;
+              }
+
+              if (imageUrl.includes('2a96cbd8b46e442fc41c2b86b821562f')) {
+                // Last.fm placeholder image
+                console.log('Last.fm returned placeholder image, skipping');
+                resolve(null);
+                return;
+              }
+
+              // Download the image
+              console.log(
+                `Downloading image from: ${imageUrl.substring(0, 80)}...`
+              );
+              const imageData = await this.downloadImage(imageUrl);
+              if (imageData) {
+                console.log(
+                  '✅ Successfully downloaded high-resolution artwork'
+                );
+                resolve(imageData);
+              } else {
+                console.log('Failed to download image from Last.fm');
+                resolve(null);
+              }
+            } catch (error) {
+              console.log('Error parsing Last.fm response:', error.message);
+              console.log('Response data:', data.substring(0, 500));
+              resolve(null);
+            }
+          });
+        });
+
+        req.on('error', (error) => {
+          console.log('Network error fetching from Last.fm:', error.message);
+          resolve(null);
+        });
+
+        // Set timeout (increased to 5 seconds for slower connections)
+        req.setTimeout(5000, () => {
+          console.log('Last.fm API request timed out');
+          req.destroy();
+          resolve(null);
+        });
+      });
+    } catch (error) {
+      console.log('Error in fetchHighResArtwork:', error.message);
+      return null;
+    }
+  }
+
+  /**
+   * Downloads an image from a URL and converts it to base64
+   * @param {string} url - Image URL
+   * @returns {Promise<string|null>} Base64 image data or null
+   */
+  static async downloadImage(url) {
+    return new Promise((resolve) => {
+      const protocol = url.startsWith('https') ? https : http;
+
+      const req = protocol.get(url, (res) => {
+        if (res.statusCode !== 200) {
+          resolve(null);
+          return;
+        }
+
+        const chunks = [];
+        res.on('data', (chunk) => {
+          chunks.push(chunk);
+        });
+
+        res.on('end', () => {
+          try {
+            const buffer = Buffer.concat(chunks);
+            const base64Data = buffer.toString('base64');
+            const contentType = res.headers['content-type'] || 'image/jpeg';
+            resolve(`data:${contentType};base64,${base64Data}`);
+          } catch (error) {
+            console.log('Error processing image:', error.message);
+            resolve(null);
+          }
+        });
+      });
+
+      req.on('error', (error) => {
+        console.log('Error downloading image:', error.message);
+        resolve(null);
+      });
+
+      // Set timeout
+      req.setTimeout(8000, () => {
+        console.log('Image download timed out');
+        req.destroy();
+        resolve(null);
+      });
+    });
+  }
+
+  /**
+   * Gets artwork data for current track
+   * Tries to fetch high-resolution artwork from Last.fm first, falls back to artworkData
+   * @param {string} artist - Artist name (optional, for Last.fm lookup)
+   * @param {string} album - Album name (optional, for Last.fm lookup)
+   * @returns {Promise<{data: string|null, isHighRes: boolean}>} Artwork data and quality flag
+   */
+  static async getArtworkData(artist = null, album = null) {
+    try {
+      // First try to fetch high-resolution artwork from Last.fm
+      if (artist && album) {
+        const highResArtwork = await this.fetchHighResArtwork(artist, album);
+        if (highResArtwork) {
+          console.log('✅ Fetched high-resolution artwork from Last.fm');
+          return { data: highResArtwork, isHighRes: true };
+        }
+      }
+
+      // Fallback to artworkData (150x150 from nowplaying-cli)
       const artworkData = await execPromise('nowplaying-cli get artworkData');
 
       if (!artworkData || artworkData === 'null' || artworkData === '') {
-        return null;
+        return { data: null, isHighRes: false };
       }
 
-      return artworkData;
+      console.log(
+        '⚠️ Using low-resolution artwork from nowplaying-cli (150x150)'
+      );
+      return { data: artworkData, isHighRes: false };
     } catch (error) {
       console.warn('Error getting artwork:', error.message);
-      return null;
+      return { data: null, isHighRes: false };
     }
   }
 }
@@ -178,30 +381,62 @@ class CoverService {
    * Saves album cover to disk
    * @param {string} album - Album name
    * @param {string} artworkData - Base64 artwork data
+   * @param {boolean} isHighRes - Whether this is a high-resolution image
    * @returns {Promise<string|null>} Relative path to saved cover or null
    */
-  static async saveCover(album, artworkData) {
+  static async saveCover(album, artworkData, isHighRes = false) {
     if (!artworkData) return null;
 
     try {
       const filename = `${sanitizeFilename(album)}.png`;
       const coverPath = path.join(__dirname, CONSTANTS.PATHS.COVERS, filename);
 
-      // Check if cover already exists
-      if (fsSync.existsSync(coverPath)) {
-        console.log(`Cover already exists: ${filename}`);
-        return `${CONSTANTS.PATHS.COVERS}/${filename}`;
-      }
-
       // Remove data:image prefix if present
       const base64Data = artworkData.replace(/^data:image\/\w+;base64,/, '');
       const buffer = Buffer.from(base64Data, 'base64');
 
+      // Check if cover already exists
+      if (fsSync.existsSync(coverPath)) {
+        const existingStats = await fs.stat(coverPath);
+        const existingSize = existingStats.size;
+        const newSize = buffer.length;
+
+        // If existing cover is low quality (small file size, typically < 20KB for 150x150)
+        // and we're trying to save a high-quality one, delete the old one
+        if (isHighRes && existingSize < 20000 && newSize > existingSize) {
+          console.log(
+            `Deleting low-quality cover (${(existingSize / 1024).toFixed(
+              2
+            )} KB) and replacing with high-quality (${(newSize / 1024).toFixed(
+              2
+            )} KB)`
+          );
+          await fs.unlink(coverPath);
+        } else if (!isHighRes && existingSize > 20000) {
+          // If we have a high-quality cover and are trying to save a low-quality one, skip
+          console.log(
+            `Skipping low-quality cover - high-quality cover already exists (${(
+              existingSize / 1024
+            ).toFixed(2)} KB)`
+          );
+          return `${CONSTANTS.PATHS.COVERS}/${filename}`;
+        } else {
+          // Same quality or better quality already exists
+          console.log(
+            `Cover already exists: ${filename} (${(existingSize / 1024).toFixed(
+              2
+            )} KB)`
+          );
+          return `${CONSTANTS.PATHS.COVERS}/${filename}`;
+        }
+      }
+
       await fs.writeFile(coverPath, buffer);
       console.log(
-        `Saved cover: ${filename} (${(buffer.length / 1024).toFixed(2)} KB)`
+        `Saved ${
+          isHighRes ? 'high-quality' : 'low-quality'
+        } cover: ${filename} (${(buffer.length / 1024).toFixed(2)} KB)`
       );
-      console.log(`Buffer length: ${buffer.length} bytes`);
 
       return `${CONSTANTS.PATHS.COVERS}/${filename}`;
     } catch (error) {
@@ -464,16 +699,22 @@ function registerIpcHandlers() {
 
       console.log(`🎵 Track changed: ${trackInfo.title} - ${trackInfo.artist}`);
 
-      const artworkData = await NowPlayingService.getArtworkData();
-      if (artworkData) {
+      const artworkResult = await NowPlayingService.getArtworkData(
+        trackInfo.artist,
+        trackInfo.album
+      );
+      if (artworkResult.data) {
         console.log(
-          `Artwork data received: ${(artworkData.length / 1024).toFixed(2)} KB`
+          `Artwork data received: ${(artworkResult.data.length / 1024).toFixed(
+            2
+          )} KB (${artworkResult.isHighRes ? 'high-res' : 'low-res'})`
         );
       }
 
       const coverPath = await CoverService.saveCover(
         trackInfo.album,
-        artworkData
+        artworkResult.data,
+        artworkResult.isHighRes
       );
 
       const result = {
