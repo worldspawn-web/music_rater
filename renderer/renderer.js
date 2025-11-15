@@ -572,6 +572,14 @@ async function createTopThreeCard(item, rank, type) {
           item.avgRating
         )}">
           ${item.avgRating.toFixed(1)}
+          ${
+            item.weightedRating !== undefined &&
+            Math.abs(item.avgRating - item.weightedRating) > 0.1
+              ? `<span class="weighted-rating-hint" title="Взвешенный рейтинг: ${item.weightedRating.toFixed(
+                  2
+                )}. Ранжирование учитывает количество оценок для более точного результата.">⚖️</span>`
+              : ''
+          }
         </div>
         <div class="top-three-count">${item.count} ${
       item.count === 1 ? 'оценка' : 'оценок'
@@ -594,6 +602,14 @@ async function createTopThreeCard(item, rank, type) {
           item.avgRating
         )}">
           ${item.avgRating.toFixed(1)}
+          ${
+            item.weightedRating !== undefined &&
+            Math.abs(item.avgRating - item.weightedRating) > 0.1
+              ? `<span class="weighted-rating-hint" title="Взвешенный рейтинг: ${item.weightedRating.toFixed(
+                  2
+                )}. Ранжирование учитывает количество оценок для более точного результата.">⚖️</span>`
+              : ''
+          }
         </div>
       </div>
     `;
@@ -613,6 +629,14 @@ async function createTopThreeCard(item, rank, type) {
           item.avgRating
         )}">
           ${item.avgRating.toFixed(1)}
+          ${
+            item.weightedRating !== undefined &&
+            Math.abs(item.avgRating - item.weightedRating) > 0.1
+              ? `<span class="weighted-rating-hint" title="Взвешенный рейтинг: ${item.weightedRating.toFixed(
+                  2
+                )}. Ранжирование учитывает количество оценок для более точного результата.">⚖️</span>`
+              : ''
+          }
         </div>
       </div>
     `;
@@ -684,27 +708,51 @@ function createRatingsTable(items, startRank, type) {
         <td class="title-col">${item.title}</td>
         <td class="artist-col">${item.artist}</td>
         <td class="genre-col">${item.genre || '—'}</td>
-        <td class="rating-col" style="color: ${getRatingColor(
-          item.avgRating
-        )}">${item.avgRating.toFixed(1)}</td>
+        <td class="rating-col" style="color: ${getRatingColor(item.avgRating)}">
+          ${item.avgRating.toFixed(1)}
+          ${
+            item.weightedRating !== undefined &&
+            Math.abs(item.avgRating - item.weightedRating) > 0.1
+              ? `<span class="weighted-rating-hint" title="Взвешенный рейтинг: ${item.weightedRating.toFixed(
+                  2
+                )}. Ранжирование учитывает количество оценок для более точного результата.">⚖️</span>`
+              : ''
+          }
+        </td>
         <td class="count-col">${item.count}</td>
       `;
     } else if (type === 'artist') {
       row.innerHTML = `
         <td class="rank-col">${rank}</td>
         <td class="artist-col">${item.artist}</td>
-        <td class="rating-col" style="color: ${getRatingColor(
-          item.avgRating
-        )}">${item.avgRating.toFixed(1)}</td>
+        <td class="rating-col" style="color: ${getRatingColor(item.avgRating)}">
+          ${item.avgRating.toFixed(1)}
+          ${
+            item.weightedRating !== undefined &&
+            Math.abs(item.avgRating - item.weightedRating) > 0.1
+              ? `<span class="weighted-rating-hint" title="Взвешенный рейтинг: ${item.weightedRating.toFixed(
+                  2
+                )}. Ранжирование учитывает количество оценок для более точного результата.">⚖️</span>`
+              : ''
+          }
+        </td>
         <td class="count-col">${item.count}</td>
       `;
     } else if (type === 'genre') {
       row.innerHTML = `
         <td class="rank-col">${rank}</td>
         <td class="genre-col">${item.genre}</td>
-        <td class="rating-col" style="color: ${getRatingColor(
-          item.avgRating
-        )}">${item.avgRating.toFixed(1)}</td>
+        <td class="rating-col" style="color: ${getRatingColor(item.avgRating)}">
+          ${item.avgRating.toFixed(1)}
+          ${
+            item.weightedRating !== undefined &&
+            Math.abs(item.avgRating - item.weightedRating) > 0.1
+              ? `<span class="weighted-rating-hint" title="Взвешенный рейтинг: ${item.weightedRating.toFixed(
+                  2
+                )}. Ранжирование учитывает количество оценок для более точного результата.">⚖️</span>`
+              : ''
+          }
+        </td>
         <td class="count-col">${item.count}</td>
       `;
     }

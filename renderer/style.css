@@ -1338,6 +1338,25 @@ select {
   font-weight: 700;
   line-height: 1;
   text-shadow: 0 2px 10px currentColor;
+  position: relative;
+}
+
+.weighted-rating-hint {
+  font-size: 0.875rem;
+  color: var(--color-text-tertiary);
+  margin-left: 0.5rem;
+  cursor: help;
+  vertical-align: middle;
+  opacity: 0.6;
+  transition: all var(--transition-base);
+  display: inline-block;
+  line-height: 1;
+}
+
+.weighted-rating-hint:hover {
+  opacity: 1;
+  color: var(--color-accent-primary);
+  transform: scale(1.1);
 }
 
 .top-three-count {
@@ -1422,10 +1441,29 @@ select {
 }
 
 .rating-col {
-  width: 80px;
+  width: 100px;
   text-align: center;
   font-weight: 700;
   font-size: 1.125rem;
+  position: relative;
+}
+
+.rating-col .weighted-rating-hint {
+  font-size: 0.875rem;
+  color: var(--color-text-tertiary);
+  margin-left: 0.5rem;
+  cursor: help;
+  vertical-align: middle;
+  opacity: 0.6;
+  transition: all var(--transition-base);
+  display: inline-block;
+  line-height: 1;
+}
+
+.rating-col .weighted-rating-hint:hover {
+  opacity: 1;
+  color: var(--color-accent-primary);
+  transform: scale(1.1);
 }
 
 .count-col {
