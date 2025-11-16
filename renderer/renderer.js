@@ -136,51 +136,121 @@ let currentTrackInfo = null;
 let currentRating = null;
 let previousTrackKey = null;
 
+/**
+ * Приводит строковое значение трека к нормальной форме
+ * и определяет, является ли оно валидным
+ * @param {string} value
+ * @returns {string|null}
+ */
+function normalizeTrackField(value) {
+  if (value === undefined || value === null) return null;
+  const trimmed = String(value).trim();
+  if (!trimmed) return null;
+  if (trimmed.toLowerCase() === 'null') return null;
+  if (trimmed === '—') return null;
+  return trimmed;
+}
+
+/**
+ * Показывает состояние, когда сейчас ничего не играет
+ */
+function showNoTrackPlaying() {
+  previousTrackKey = null;
+  currentTrackInfo = null;
+  currentRating = null;
+
+  const titleEl = document.getElementById('track-title');
+  const artistEl = document.getElementById('track-artist');
+  const albumEl = document.getElementById('track-album');
+  const albumCover = document.getElementById('album-cover');
+  const noCover = document.getElementById('no-cover');
+  const background = document.getElementById('dynamic-background');
+
+  if (titleEl) {
+    titleEl.textContent = 'Сейчас ничего не играет';
+  }
+  if (artistEl) {
+    artistEl.textContent = '';
+  }
+  if (albumEl) {
+    albumEl.textContent = '';
+  }
+
+  if (albumCover && noCover && background) {
+    albumCover.style.display = 'none';
+    noCover.style.display = 'flex';
+    background.classList.remove('active');
+  }
+
+  // Сбрасываем состояние рейтинга и выбранных значений
+  resetRatingButtons();
+}
+
 async function fetchCurrentTrack() {
   try {
     const trackInfo = await ipcRenderer.invoke('getCurrentTrack');
 
-    const trackKey = `${trackInfo.title}|||${trackInfo.artist}`;
+    // Обработка случая, когда ничего не играет или данные некорректны
+    const normalizedTitle = normalizeTrackField(trackInfo?.title);
+    const normalizedArtist = normalizeTrackField(trackInfo?.artist);
+    const normalizedAlbum = normalizeTrackField(trackInfo?.album);
 
-    if (previousTrackKey === trackKey) {
-      // Track hasn't changed, skip all updates silently
+    if (!normalizedTitle || !normalizedArtist) {
+      showNoTrackPlaying();
       return;
     }
 
-    // Track has changed
+    const safeTrackInfo = {
+      ...trackInfo,
+      title: normalizedTitle,
+      artist: normalizedArtist,
+      album: normalizedAlbum || '',
+    };
+
+    const trackKey = `${safeTrackInfo.title}|||${safeTrackInfo.artist}`;
+
+    if (previousTrackKey === trackKey) {
+      // Трек не изменился, пропускаем обновление
+      return;
+    }
+
+    // Трек сменился
     if (previousTrackKey !== null) {
-      console.log(`Трек сменился: ${trackInfo.artist} - ${trackInfo.title}`);
+      console.log(
+        `Трек сменился: ${safeTrackInfo.artist} - ${safeTrackInfo.title}`
+      );
     }
 
     previousTrackKey = trackKey;
 
-    document.getElementById('track-title').textContent = trackInfo.title;
+    document.getElementById('track-title').textContent = safeTrackInfo.title;
 
     const artistElement = document.getElementById('track-artist');
     const artistRatings = await ipcRenderer.invoke('getArtistRatings');
     const artistRating = artistRatings.find(
-      (r) => r.artist === trackInfo.artist
+      (r) => r.artist === safeTrackInfo.artist
     );
 
     if (artistRating) {
       const ratingColor = getRatingColor(artistRating.avgRating);
       artistElement.innerHTML = `${
-        trackInfo.artist
+        safeTrackInfo.artist
       } <span class="artist-rating" style="color: ${ratingColor}; font-weight: 700; margin-left: 0.5rem;">${artistRating.avgRating.toFixed(
         1
       )}</span>`;
     } else {
-      artistElement.textContent = trackInfo.artist;
+      artistElement.textContent = safeTrackInfo.artist;
     }
 
-    document.getElementById('track-album').textContent = trackInfo.album;
+    document.getElementById('track-album').textContent =
+      safeTrackInfo.album || '';
 
     const albumCover = document.getElementById('album-cover');
     const noCover = document.getElementById('no-cover');
     const background = document.getElementById('dynamic-background');
 
-    if (trackInfo.coverPath) {
-      albumCover.src = '../' + trackInfo.coverPath;
+    if (safeTrackInfo.coverPath) {
+      albumCover.src = '../' + safeTrackInfo.coverPath;
       albumCover.style.display = 'block';
       noCover.style.display = 'none';
 
@@ -196,17 +266,17 @@ async function fetchCurrentTrack() {
     // Сбрасываем состояние кнопок рейтинга при смене трека
     if (
       currentTrackInfo &&
-      (currentTrackInfo.title !== trackInfo.title ||
-        currentTrackInfo.artist !== trackInfo.artist)
+      (currentTrackInfo.title !== safeTrackInfo.title ||
+        currentTrackInfo.artist !== safeTrackInfo.artist)
     ) {
       resetRatingButtons();
       currentRating = null;
     }
 
-    currentTrackInfo = trackInfo;
+    currentTrackInfo = safeTrackInfo;
 
     // Проверяем, был ли уже поставлен рейтинг для этого трека
-    const lastRating = await ipcRenderer.invoke('getLastRating', trackInfo);
+    const lastRating = await ipcRenderer.invoke('getLastRating', safeTrackInfo);
     if (lastRating) {
       currentRating = lastRating.rating;
       blockRatingButtons(lastRating.rating);
@@ -214,7 +284,8 @@ async function fetchCurrentTrack() {
       resetRatingButtons();
     }
   } catch (error) {
-    console.error(error);
+    console.error('Ошибка получения текущего трека:', error);
+    showNoTrackPlaying();
   }
 }
 
