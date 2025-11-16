@@ -15,8 +15,8 @@ const http = require('http');
 
 const CONSTANTS = {
   WINDOW: {
-    WIDTH: 1280,
-    HEIGHT: 720,
+    WIDTH: 1600,
+    HEIGHT: 900,
     MIN_WIDTH: 800,
     MIN_HEIGHT: 600,
   },
