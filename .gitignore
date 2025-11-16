@@ -19,3 +19,6 @@ logs/
 
 # Other
 covers/
+
+# Builds
+dist/
