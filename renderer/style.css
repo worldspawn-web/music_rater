@@ -1341,24 +1341,6 @@ select {
   position: relative;
 }
 
-.weighted-rating-hint {
-  font-size: 0.875rem;
-  color: var(--color-text-tertiary);
-  margin-left: 0.5rem;
-  cursor: help;
-  vertical-align: middle;
-  opacity: 0.6;
-  transition: all var(--transition-base);
-  display: inline-block;
-  line-height: 1;
-}
-
-.weighted-rating-hint:hover {
-  opacity: 1;
-  color: var(--color-accent-primary);
-  transform: scale(1.1);
-}
-
 .top-three-count {
   font-size: 0.875rem;
   color: var(--color-text-tertiary);
@@ -1445,26 +1427,16 @@ select {
   text-align: center;
   font-weight: 700;
   font-size: 1.125rem;
-  position: relative;
 }
 
-.rating-col .weighted-rating-hint {
-  font-size: 0.875rem;
-  color: var(--color-text-tertiary);
-  margin-left: 0.5rem;
-  cursor: help;
-  vertical-align: middle;
-  opacity: 0.6;
-  transition: all var(--transition-base);
-  display: inline-block;
-  line-height: 1;
+.weighted-rating-col {
+  width: 120px;
+  text-align: center;
+  font-weight: 600;
+  font-size: 1rem;
+  color: var(--color-text-secondary);
 }
 
-.rating-col .weighted-rating-hint:hover {
-  opacity: 1;
-  color: var(--color-accent-primary);
-  transform: scale(1.1);
-}
 
 .count-col {
   width: 80px;
