@@ -331,15 +331,49 @@ class NowPlayingService {
   }
 
   /**
+   * Checks if a high-resolution cover already exists for the album
+   * @param {string} album - Album name
+   * @returns {Promise<boolean>} True if high-res cover exists
+   */
+  static async hasHighResCover(album) {
+    if (!album) return false;
+
+    try {
+      const filename = `${sanitizeFilename(album)}.png`;
+      const coverPath = path.join(__dirname, CONSTANTS.PATHS.COVERS, filename);
+
+      if (fsSync.existsSync(coverPath)) {
+        const stats = await fs.stat(coverPath);
+        // High-res covers are typically > 20KB
+        if (stats.size > 20000) {
+          return true;
+        }
+      }
+      return false;
+    } catch (error) {
+      return false;
+    }
+  }
+
+  /**
    * Gets artwork data for current track
-   * Tries to fetch high-resolution artwork from Last.fm first, falls back to artworkData
+   * Checks for existing high-res cover first, then tries Last.fm, falls back to artworkData
    * @param {string} artist - Artist name (optional, for Last.fm lookup)
    * @param {string} album - Album name (optional, for Last.fm lookup)
    * @returns {Promise<{data: string|null, isHighRes: boolean}>} Artwork data and quality flag
    */
   static async getArtworkData(artist = null, album = null) {
     try {
-      // First try to fetch high-resolution artwork from Last.fm
+      // First check if a high-resolution cover already exists
+      if (album && (await this.hasHighResCover(album))) {
+        console.log(
+          '✅ High-resolution cover already exists, skipping API request'
+        );
+        // Return null data - the cover path will be handled by saveCover
+        return { data: null, isHighRes: true };
+      }
+
+      // If no high-res cover exists, try to fetch from Last.fm
       if (artist && album) {
         const highResArtwork = await this.fetchHighResArtwork(artist, album);
         if (highResArtwork) {
@@ -1010,11 +1044,20 @@ function registerIpcHandlers() {
         );
       }
 
-      const coverPath = await CoverService.saveCover(
-        trackInfo.album,
-        artworkResult.data,
-        artworkResult.isHighRes
-      );
+      // If we have high-res cover but no data (already exists), get the path directly
+      let coverPath;
+      if (artworkResult.isHighRes && !artworkResult.data) {
+        // High-res cover exists, get the path without saving
+        const filename = `${sanitizeFilename(trackInfo.album)}.png`;
+        coverPath = `${CONSTANTS.PATHS.COVERS}/${filename}`;
+      } else {
+        // Save the cover (or skip if already exists)
+        coverPath = await CoverService.saveCover(
+          trackInfo.album,
+          artworkResult.data,
+          artworkResult.isHighRes
+        );
+      }
 
       const result = {
         ...trackInfo,
