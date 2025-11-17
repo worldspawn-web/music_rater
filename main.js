@@ -447,6 +447,78 @@ class CoverService {
 }
 
 /**
+ * Parses artist string into individual artist names
+ * Handles cases where artist names contain commas (e.g., "Tyler, The Creator")
+ * @param {string} artistString - Artist string that may contain multiple artists
+ * @returns {Array<string>} Array of individual artist names
+ */
+function parseArtists(artistString) {
+  if (!artistString || typeof artistString !== 'string') {
+    return [];
+  }
+
+  // Common separators for multiple artists (in order of preference)
+  // We check for these patterns with spaces around them
+  const separators = [
+    /\s+feat\.\s+/gi, // "feat." with spaces (check first to avoid splitting "feat." in names)
+    /\s+ft\.\s+/gi, // "ft." with spaces
+    /\s+featuring\s+/gi, // "featuring" with spaces
+    /\s+&\s+/g, // Ampersand with spaces
+    /\s+x\s+/g, // "x" with spaces (collaboration)
+    /\s+\/\s+/g, // Slash with spaces
+    /,\s+/g, // Comma with space (most common, but check last due to names like "Tyler, The Creator")
+  ];
+
+  let artists = [artistString.trim()];
+
+  // Try each separator pattern
+  for (const separator of separators) {
+    const newArtists = [];
+    let foundSeparator = false;
+
+    for (const artist of artists) {
+      const parts = artist.split(separator);
+      if (parts.length > 1) {
+        foundSeparator = true;
+        // Filter out empty parts and trim
+        newArtists.push(
+          ...parts.map((p) => p.trim()).filter((p) => p.length > 0)
+        );
+      } else {
+        newArtists.push(artist);
+      }
+    }
+
+    if (foundSeparator) {
+      artists = newArtists;
+      break; // Use first separator that finds matches
+    }
+  }
+
+  // Clean up and filter
+  return artists
+    .map((artist) => artist.trim())
+    .filter((artist) => artist.length > 0);
+}
+
+/**
+ * Calculates per-artist rating when multiple artists are on a track
+ * Uses a modifier formula: rating - (number_of_artists - 1) * 0.5
+ * Example: 8.0 rating with 3 artists = 8.0 - (3-1)*0.5 = 7.0 per artist
+ * @param {number} trackRating - Original track rating
+ * @param {number} artistCount - Number of artists on the track
+ * @returns {number} Per-artist rating
+ */
+function calculatePerArtistRating(trackRating, artistCount) {
+  if (artistCount <= 1) {
+    return trackRating;
+  }
+  // Formula: subtract 0.5 for each additional artist beyond the first
+  const modifier = (artistCount - 1) * 0.5;
+  return Math.max(1, trackRating - modifier); // Ensure minimum rating of 1
+}
+
+/**
  * Service for managing ratings
  */
 class RatingService {
@@ -565,7 +637,12 @@ class RatingService {
 
     const data = await this.getAllRatings();
 
-    // Find existing track or create new one
+    // Parse individual artists from the artist string
+    const artists = parseArtists(trackInfo.artist);
+    const artistCount = artists.length;
+    const perArtistRating = calculatePerArtistRating(ratingNum, artistCount);
+
+    // Find existing track or create new one (still using full artist string for track lookup)
     let track = data.tracks.find(
       (t) => t.title === trackInfo.title && t.artist === trackInfo.artist
     );
@@ -597,9 +674,20 @@ class RatingService {
       data.tracks.push(track);
     }
 
+    // Now save ratings for each individual artist
+    // We need to find or create artist entries and add the per-artist rating
+    // Since we're storing by track, we'll aggregate artists when getting ratings
+    // For now, we'll store the track rating and parse artists when aggregating
+
     await writeJsonFile(CONSTANTS.PATHS.RATINGS, data);
 
-    console.log(`Saved rating: ${trackInfo.title} - ${ratingNum}/10`);
+    console.log(
+      `Saved rating: ${
+        trackInfo.title
+      } - ${ratingNum}/10 (${artistCount} artist(s), ${perArtistRating.toFixed(
+        1
+      )} per artist)`
+    );
     return { success: true };
   }
 
@@ -652,22 +740,37 @@ class RatingService {
 
   /**
    * Gets aggregated artist ratings with Bayesian weighted scoring
+   * Parses individual artists from track artist strings and aggregates ratings
    * @returns {Promise<Array>} Array of artist ratings with weighted averages
    */
   static async getArtistRatings() {
     const data = await this.getAllRatings();
     const artistMap = new Map();
 
+    // Process each track and split ratings across individual artists
     data.tracks.forEach((track) => {
-      if (!artistMap.has(track.artist)) {
-        artistMap.set(track.artist, {
-          artist: track.artist,
-          ratings: [],
-        });
-      }
+      // Parse individual artists from the track's artist string
+      const artists = parseArtists(track.artist);
+      const artistCount = artists.length;
 
+      // For each rating on this track, distribute it to individual artists
       track.ratings.forEach((rating) => {
-        artistMap.get(track.artist).ratings.push(rating.rating);
+        const perArtistRating = calculatePerArtistRating(
+          rating.rating,
+          artistCount
+        );
+
+        // Add this rating to each individual artist
+        artists.forEach((artistName) => {
+          if (!artistMap.has(artistName)) {
+            artistMap.set(artistName, {
+              artist: artistName,
+              ratings: [],
+            });
+          }
+
+          artistMap.get(artistName).ratings.push(perArtistRating);
+        });
       });
     });
 

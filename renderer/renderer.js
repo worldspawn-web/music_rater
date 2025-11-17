@@ -152,6 +152,54 @@ function normalizeTrackField(value) {
 }
 
 /**
+ * Parses artist string into individual artist names
+ * Matches the logic from main.js
+ * @param {string} artistString - Artist string that may contain multiple artists
+ * @returns {Array<string>} Array of individual artist names
+ */
+function parseArtists(artistString) {
+  if (!artistString || typeof artistString !== 'string') {
+    return [];
+  }
+
+  const separators = [
+    /\s+feat\.\s+/gi,
+    /\s+ft\.\s+/gi,
+    /\s+featuring\s+/gi,
+    /\s+&\s+/g,
+    /\s+x\s+/g,
+    /\s+\/\s+/g,
+    /,\s+/g,
+  ];
+
+  let artists = [artistString.trim()];
+
+  for (const separator of separators) {
+    const newArtists = [];
+    let foundSeparator = false;
+
+    for (const artist of artists) {
+      const parts = artist.split(separator);
+      if (parts.length > 1) {
+        foundSeparator = true;
+        newArtists.push(...parts.map(p => p.trim()).filter(p => p.length > 0));
+      } else {
+        newArtists.push(artist);
+      }
+    }
+
+    if (foundSeparator) {
+      artists = newArtists;
+      break;
+    }
+  }
+
+  return artists
+    .map(artist => artist.trim())
+    .filter(artist => artist.length > 0);
+}
+
+/**
  * Показывает состояние, когда сейчас ничего не играет
  */
 function showNoTrackPlaying() {
@@ -227,19 +275,89 @@ async function fetchCurrentTrack() {
 
     const artistElement = document.getElementById('track-artist');
     const artistRatings = await ipcRenderer.invoke('getArtistRatings');
-    const artistRating = artistRatings.find(
-      (r) => r.artist === safeTrackInfo.artist
-    );
+    
+    // Parse individual artists
+    const artists = parseArtists(safeTrackInfo.artist);
+    
+    if (artists.length === 1) {
+      // Single artist - show rating directly
+      const artistRating = artistRatings.find(
+        (r) => r.artist === artists[0]
+      );
 
-    if (artistRating) {
-      const ratingColor = getRatingColor(artistRating.avgRating);
-      artistElement.innerHTML = `${
-        safeTrackInfo.artist
-      } <span class="artist-rating" style="color: ${ratingColor}; font-weight: 700; margin-left: 0.5rem;">${artistRating.avgRating.toFixed(
-        1
-      )}</span>`;
+      if (artistRating) {
+        const ratingColor = getRatingColor(artistRating.avgRating);
+        artistElement.innerHTML = `${
+          artists[0]
+        } <span class="artist-rating" style="color: ${ratingColor}; font-weight: 700; margin-left: 0.5rem;">${artistRating.avgRating.toFixed(
+          1
+        )}</span>`;
+      } else {
+        artistElement.textContent = artists[0];
+      }
+      // Remove any existing multi-artist UI
+      const expandBtn = artistElement.querySelector('.artist-expand-btn');
+      const dropdown = artistElement.querySelector('.artist-ratings-dropdown');
+      if (expandBtn) expandBtn.remove();
+      if (dropdown) dropdown.remove();
     } else {
-      artistElement.textContent = safeTrackInfo.artist;
+      // Multiple artists - show average rating with expand button
+      const artistRatingData = artists.map(artistName => {
+        return artistRatings.find(r => r.artist === artistName);
+      }).filter(r => r !== undefined);
+      
+      if (artistRatingData.length > 0) {
+        // Calculate average rating
+        const avgRating = artistRatingData.reduce((sum, r) => sum + r.avgRating, 0) / artistRatingData.length;
+        const ratingColor = getRatingColor(avgRating);
+        
+        // Create expand button if it doesn't exist
+        let expandBtn = artistElement.querySelector('.artist-expand-btn');
+        if (!expandBtn) {
+          expandBtn = document.createElement('button');
+          expandBtn.className = 'artist-expand-btn';
+          expandBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg>';
+          expandBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const dropdown = artistElement.querySelector('.artist-ratings-dropdown');
+            if (dropdown) {
+              dropdown.classList.toggle('visible');
+              expandBtn.classList.toggle('expanded');
+            }
+          });
+        }
+        
+        // Create dropdown if it doesn't exist
+        let dropdown = artistElement.querySelector('.artist-ratings-dropdown');
+        if (!dropdown) {
+          dropdown = document.createElement('div');
+          dropdown.className = 'artist-ratings-dropdown';
+        }
+        
+        // Update dropdown content
+        dropdown.innerHTML = artistRatingData.map(rating => {
+          const color = getRatingColor(rating.avgRating);
+          return `<div class="artist-rating-item">
+            <span class="artist-rating-name">${rating.artist}</span>
+            <span class="artist-rating-value" style="color: ${color};">${rating.avgRating.toFixed(1)}</span>
+          </div>`;
+        }).join('');
+        
+        // Update main display
+        artistElement.innerHTML = `
+          <span class="artist-names">${artists.join(', ')}</span>
+          <span class="artist-rating" style="color: ${ratingColor}; font-weight: 700; margin-left: 0.5rem;">${avgRating.toFixed(1)}</span>
+        `;
+        artistElement.appendChild(expandBtn);
+        artistElement.appendChild(dropdown);
+      } else {
+        // No ratings yet, just show artist names
+        artistElement.innerHTML = `<span class="artist-names">${artists.join(', ')}</span>`;
+        const expandBtn = artistElement.querySelector('.artist-expand-btn');
+        const dropdown = artistElement.querySelector('.artist-ratings-dropdown');
+        if (expandBtn) expandBtn.remove();
+        if (dropdown) dropdown.remove();
+      }
     }
 
     document.getElementById('track-album').textContent =
@@ -341,33 +459,8 @@ document.querySelectorAll('.rating-button').forEach((button) => {
         loadGenreDropdown(); // Call loadGenreDropdown to update genre list
         document.getElementById('genre-select').value = genre;
 
-        const artistRatings = await ipcRenderer.invoke('getArtistRatings');
-        const artistRating = artistRatings.find(
-          (r) => r.artist === trackArtist
-        );
-        if (artistRating) {
-          const oldRatingElement = document
-            .getElementById('track-artist')
-            .querySelector('.artist-rating');
-          const oldRating = oldRatingElement
-            ? Number.parseFloat(oldRatingElement.textContent)
-            : 0;
-
-          if (oldRating > 0 && oldRating !== artistRating.avgRating) {
-            animateRatingChange(
-              document.getElementById('track-artist'),
-              oldRating,
-              artistRating.avgRating
-            );
-          } else {
-            const ratingColor = getRatingColor(artistRating.avgRating);
-            document.getElementById(
-              'track-artist'
-            ).innerHTML = `${trackArtist} <span class="artist-rating" style="color: ${ratingColor}; font-weight: 700; margin-left: 0.5rem;">${artistRating.avgRating.toFixed(
-              1
-            )}</span>`;
-          }
-        }
+        // Refresh artist display (handles both single and multiple artists)
+        await fetchCurrentTrack();
       } else {
         alert(result.message);
       }
@@ -925,6 +1018,19 @@ function animateNumber(element, start, end) {
 
   requestAnimationFrame(update);
 }
+
+// Close artist ratings dropdown when clicking outside
+document.addEventListener('click', (e) => {
+  const artistElement = document.getElementById('track-artist');
+  if (artistElement && !artistElement.contains(e.target)) {
+    const dropdown = artistElement.querySelector('.artist-ratings-dropdown');
+    const expandBtn = artistElement.querySelector('.artist-expand-btn');
+    if (dropdown && dropdown.classList.contains('visible')) {
+      dropdown.classList.remove('visible');
+      if (expandBtn) expandBtn.classList.remove('expanded');
+    }
+  }
+});
 
 // Обновляем информацию о треке каждые 5 секунд
 setInterval(fetchCurrentTrack, 5000);
