@@ -23,6 +23,7 @@ const CONSTANTS = {
   PATHS: {
     COVERS: 'covers',
     RATINGS: 'ratings.json',
+    VIBES: 'vibes.json',
   },
   RATING: {
     COOLDOWN_MS: 5 * 60 * 1000, // 5 minutes
@@ -610,6 +611,7 @@ class RatingService {
       return {
         rating: lastRating.rating,
         timestamp: lastRating.timestamp,
+        vibes: lastRating.vibes || [],
       };
     }
 
@@ -715,6 +717,13 @@ class RatingService {
         minRatings
       );
 
+      // Get the most recent vibe from the most recent rating
+      const mostRecentRating = track.ratings[track.ratings.length - 1];
+      const mood =
+        mostRecentRating.vibes && mostRecentRating.vibes.length > 0
+          ? mostRecentRating.vibes[0]
+          : null;
+
       return {
         title: track.title,
         artist: track.artist,
@@ -723,6 +732,7 @@ class RatingService {
         weightedRating, // Use this for sorting (more trustworthy)
         count,
         genre: track.genre,
+        mood, // Most recent mood/vibe
         flag: track.flag,
         favorite: track.favorite,
         coverPath: `covers/${sanitizeFilename(track.album)}.png`,
@@ -870,6 +880,68 @@ class RatingService {
         b.avgRating - a.avgRating
     );
   }
+
+  /**
+   * Gets aggregated vibe ratings with Bayesian weighted scoring
+   * @returns {Promise<Array>} Array of vibe ratings with weighted averages
+   */
+  static async getVibeRatings() {
+    const data = await this.getAllRatings();
+    const vibeMap = new Map();
+
+    data.tracks.forEach((track) => {
+      track.ratings.forEach((rating) => {
+        if (rating.vibes && rating.vibes.length > 0) {
+          rating.vibes.forEach((vibe) => {
+            if (!vibeMap.has(vibe)) {
+              vibeMap.set(vibe, {
+                vibe: vibe,
+                ratings: [],
+              });
+            }
+
+            vibeMap.get(vibe).ratings.push(rating.rating);
+          });
+        }
+      });
+    });
+
+    const vibes = Array.from(vibeMap.values());
+
+    // Calculate global average across all vibes
+    const globalAvg = this.calculateGlobalAverage(vibes);
+    const minRatings = 3; // Minimum ratings for trustworthy score
+
+    // Calculate averages and weighted ratings
+    const vibeRatings = vibes.map((vibe) => {
+      const avgRating =
+        vibe.ratings.reduce((sum, r) => sum + r, 0) / vibe.ratings.length;
+      const count = vibe.ratings.length;
+
+      // Calculate weighted rating (trustworthy score)
+      const weightedRating = this.calculateWeightedRating(
+        avgRating,
+        count,
+        globalAvg,
+        minRatings
+      );
+
+      return {
+        vibe: vibe.vibe,
+        avgRating, // Keep original average for display
+        weightedRating, // Use this for sorting (more trustworthy)
+        count,
+      };
+    });
+
+    // Sort by weighted rating (trustworthy score), then by count, then by avgRating
+    return vibeRatings.sort(
+      (a, b) =>
+        b.weightedRating - a.weightedRating ||
+        b.count - a.count ||
+        b.avgRating - a.avgRating
+    );
+  }
 }
 
 // ============================================================================
@@ -1008,6 +1080,81 @@ function registerIpcHandlers() {
     } catch (error) {
       console.error('IPC Error - getGenreRatings:', error);
       return [];
+    }
+  });
+
+  // Get vibe ratings
+  ipcMain.handle('getVibeRatings', async () => {
+    try {
+      return await RatingService.getVibeRatings();
+    } catch (error) {
+      console.error('IPC Error - getVibeRatings:', error);
+      return [];
+    }
+  });
+
+  // Get recently used vibes
+  ipcMain.handle('getRecentVibes', async () => {
+    try {
+      const data = await RatingService.getAllRatings();
+      const vibeTimestamps = [];
+
+      data.tracks.forEach((track) => {
+        track.ratings.forEach((rating) => {
+          if (rating.vibes && rating.vibes.length > 0) {
+            rating.vibes.forEach((vibe) => {
+              vibeTimestamps.push({
+                vibe: vibe,
+                timestamp: rating.timestamp,
+              });
+            });
+          }
+        });
+      });
+
+      // Sort by timestamp (most recent first)
+      vibeTimestamps.sort(
+        (a, b) => new Date(b.timestamp) - new Date(a.timestamp)
+      );
+
+      // Get unique vibes in order of most recent use
+      const uniqueVibes = [];
+      const seenVibes = new Set();
+      for (const item of vibeTimestamps) {
+        if (!seenVibes.has(item.vibe)) {
+          seenVibes.add(item.vibe);
+          uniqueVibes.push(item.vibe);
+        }
+      }
+
+      return uniqueVibes.slice(0, 5); // Return 5 most recently used
+    } catch (error) {
+      console.error('IPC Error - getRecentVibes:', error);
+      return [];
+    }
+  });
+
+  // Get all vibes from vibes.json
+  ipcMain.handle('getVibes', async () => {
+    try {
+      const vibes = await readJsonFile(CONSTANTS.PATHS.VIBES, {});
+      return vibes;
+    } catch (error) {
+      console.error('IPC Error - getVibes:', error);
+      return {};
+    }
+  });
+
+  // Save vibe to vibes.json
+  ipcMain.handle('saveVibe', async (event, { name, color }) => {
+    try {
+      const vibes = await readJsonFile(CONSTANTS.PATHS.VIBES, {});
+      vibes[name] = color;
+      await writeJsonFile(CONSTANTS.PATHS.VIBES, vibes);
+      return { success: true };
+    } catch (error) {
+      console.error('IPC Error - saveVibe:', error);
+      return { success: false, message: 'Ошибка при сохранении настроения' };
     }
   });
 }

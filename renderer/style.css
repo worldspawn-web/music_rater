@@ -926,10 +926,23 @@ select {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 32px;
-  height: 32px;
+  padding: 0.25rem 0.75rem;
   border-radius: var(--radius-full);
-  background: var(--vibe-color, var(--color-bg-elevated));
+  background: rgba(0, 0, 0, 0.2);
+  backdrop-filter: blur(12px) saturate(180%);
+  -webkit-backdrop-filter: blur(12px) saturate(180%);
+  color: var(--color-text-primary);
+  border: 1.5px solid rgba(var(--vibe-color-rgb, 59, 130, 246), 0.5);
+  box-shadow: 0 0 8px rgba(var(--vibe-color-rgb, 59, 130, 246), 0.3);
+  font-size: 0.75rem;
+  font-weight: 500;
+  min-width: fit-content;
+  transition: all var(--transition-base);
+}
+
+.vibe-badge:hover {
+  border-color: rgba(var(--vibe-color-rgb, 59, 130, 246), 0.7);
+  box-shadow: 0 0 12px rgba(var(--vibe-color-rgb, 59, 130, 246), 0.4);
 }
 
 /* Empty State */
@@ -1401,6 +1414,11 @@ select {
   font-size: 1rem;
   color: var(--color-text-secondary);
   margin: 0;
+}
+
+.top-three-mood {
+  margin-top: var(--spacing-xs);
+  display: inline-block;
 }
 
 .top-three-genre {

@@ -21,6 +21,8 @@ document.querySelectorAll('.nav-tab').forEach((button) => {
       loadArtistRatings();
     } else if (button.getAttribute('data-tab') === 'genre-ratings') {
       loadGenreRatings();
+    } else if (button.getAttribute('data-tab') === 'vibe-ratings') {
+      loadVibeRatings();
     }
   });
 });
@@ -458,8 +460,43 @@ async function fetchCurrentTrack() {
     if (lastRating) {
       currentRating = lastRating.rating;
       blockRatingButtons(lastRating.rating);
+      
+      // Auto-select and disable mood if track was previously rated
+      if (lastRating.vibes && lastRating.vibes.length > 0) {
+        const mood = lastRating.vibes[0];
+        const moodButton = document.querySelector(
+          `.vibe-chip[data-vibe="${mood}"]`
+        );
+        if (moodButton) {
+          // Remove active from all vibes
+          document
+            .querySelectorAll('.vibe-chip:not(.add-vibe)')
+            .forEach((btn) => {
+              btn.classList.remove('active');
+              btn.disabled = false;
+            });
+          // Set active and disable
+          moodButton.classList.add('active');
+          moodButton.disabled = true;
+          // Disable all other vibe buttons
+          document
+            .querySelectorAll('.vibe-chip:not(.add-vibe)')
+            .forEach((btn) => {
+              if (btn !== moodButton) {
+                btn.disabled = true;
+              }
+            });
+        }
+      }
     } else {
       resetRatingButtons();
+      // Reset vibe buttons
+      document
+        .querySelectorAll('.vibe-chip:not(.add-vibe)')
+        .forEach((btn) => {
+          btn.classList.remove('active');
+          btn.disabled = false;
+        });
     }
   } catch (error) {
     console.error('Ошибка получения текущего трека:', error);
@@ -496,8 +533,22 @@ document.querySelectorAll('.rating-button').forEach((button) => {
     const trackArtist = currentTrackInfo.artist;
     const trackAlbum = document.getElementById('track-album').textContent;
     const genre = document.getElementById('genre-select').value;
-    const vibeButton = document.querySelector('.vibe-chip.active');
-    const vibe = vibeButton ? vibeButton.getAttribute('data-vibe') : null;
+    
+    // Check if track was previously rated - if so, use existing vibe, don't allow new selection
+    const lastRating = await ipcRenderer.invoke('getLastRating', {
+      title: trackTitle,
+      artist: trackArtist,
+    });
+    
+    let vibe = null;
+    if (lastRating && lastRating.vibes && lastRating.vibes.length > 0) {
+      // Use existing vibe from previous rating
+      vibe = lastRating.vibes[0];
+    } else {
+      // Allow new vibe selection
+      const vibeButton = document.querySelector('.vibe-chip.active');
+      vibe = vibeButton ? vibeButton.getAttribute('data-vibe') : null;
+    }
 
     const trackInfo = {
       title: trackTitle,
@@ -600,9 +651,21 @@ document.querySelectorAll('.vibe-chip:not(.add-vibe)').forEach((button) => {
   // Extract RGB values from color for glassmorphism effect
   const color = button.style.getPropertyValue('--vibe-color');
   if (color) {
-    const rgb = color.match(/\d+/g);
-    if (rgb && rgb.length === 3) {
-      button.style.setProperty('--vibe-color-rgb', rgb.join(', '));
+    let rgbString = '';
+    if (color.startsWith('#')) {
+      const hex = color.replace('#', '');
+      const r = parseInt(hex.substring(0, 2), 16);
+      const g = parseInt(hex.substring(2, 4), 16);
+      const b = parseInt(hex.substring(4, 6), 16);
+      rgbString = `${r}, ${g}, ${b}`;
+    } else if (color.startsWith('rgb')) {
+      const rgb = color.match(/\d+/g);
+      if (rgb && rgb.length >= 3) {
+        rgbString = `${rgb[0]}, ${rgb[1]}, ${rgb[2]}`;
+      }
+    }
+    if (rgbString) {
+      button.style.setProperty('--vibe-color-rgb', rgbString);
     }
   }
 });
@@ -614,42 +677,34 @@ document.getElementById('add-vibe-button').addEventListener('click', () => {
 });
 
 // Обработчик для кнопки сохранения нового вайба
-document.getElementById('save-vibe-button').addEventListener('click', () => {
-  const newVibeName = document.getElementById('new-vibe-name').value;
+document.getElementById('save-vibe-button').addEventListener('click', async () => {
+  const newVibeName = document.getElementById('new-vibe-name').value.trim();
   const newVibeColor = document.getElementById('new-vibe-color').value;
 
   if (newVibeName) {
-    addVibe(newVibeName, newVibeColor);
+    await addVibe(newVibeName, newVibeColor);
     document.getElementById('new-vibe-name').value = '';
     document.getElementById('vibe-input').classList.add('hidden');
   }
 });
 
 // Функция для добавления нового вайба
-function addVibe(name, color) {
-  const vibeGrid = document.getElementById('vibe-buttons');
-  const addButton = document.getElementById('add-vibe-button');
-
-  const newVibeButton = document.createElement('button');
-  newVibeButton.className = 'vibe-chip';
-  newVibeButton.textContent = name;
-  newVibeButton.setAttribute('data-vibe', name);
-  newVibeButton.style.setProperty('--vibe-color', color);
-
-  // Extract RGB values for glassmorphism
-  const rgb = color.match(/\d+/g);
-  if (rgb && rgb.length === 3) {
-    newVibeButton.style.setProperty('--vibe-color-rgb', rgb.join(', '));
+async function addVibe(name, color) {
+  // Store custom vibe in vibes.json
+  try {
+    const result = await ipcRenderer.invoke('saveVibe', { name, color });
+    if (result.success) {
+      // Clear cache to force reload
+      vibeColorsCache = null;
+      // Reload vibe buttons to include the new one
+      await loadVibeButtons();
+    } else {
+      alert(result.message || 'Ошибка при сохранении настроения');
+    }
+  } catch (e) {
+    console.error('Error saving custom vibe:', e);
+    alert('Ошибка при сохранении настроения');
   }
-
-  newVibeButton.addEventListener('click', () => {
-    document
-      .querySelectorAll('.vibe-chip:not(.add-vibe)')
-      .forEach((btn) => btn.classList.remove('active'));
-    newVibeButton.classList.add('active');
-  });
-
-  vibeGrid.insertBefore(newVibeButton, addButton);
 }
 
 // Загрузка рейтингов треков
@@ -772,6 +827,46 @@ async function loadGenreRatings() {
   }
 }
 
+// Загрузка рейтингов настроений
+async function loadVibeRatings() {
+  try {
+    const ratings = await ipcRenderer.invoke('getVibeRatings');
+    const topThree = document.getElementById('vibe-top-three');
+    const table = document.getElementById('vibe-ratings-table');
+    const emptyState = document.getElementById('vibe-ratings-empty');
+
+    topThree.innerHTML = '';
+    table.innerHTML = '';
+
+    if (ratings.length === 0) {
+      emptyState.classList.remove('hidden');
+      topThree.style.display = 'none';
+      table.style.display = 'none';
+      return;
+    }
+
+    emptyState.classList.add('hidden');
+    topThree.style.display = 'flex';
+    table.style.display = 'block';
+
+    const limitedRatings = ratings.slice(0, 100);
+    const top3 = limitedRatings.slice(0, 3);
+    const rest = limitedRatings.slice(3);
+
+    for (let i = 0; i < top3.length; i++) {
+      const card = await createTopThreeCard(top3[i], i + 1, 'vibe');
+      topThree.appendChild(card);
+    }
+
+    // Create table for rest
+    if (rest.length > 0) {
+      table.appendChild(createRatingsTable(rest, 4, 'vibe'));
+    }
+  } catch (error) {
+    console.error('Ошибка при загрузке рейтингов настроений:', error);
+  }
+}
+
 /**
  * Creates a top 3 card with special effects and album cover
  * @param {Object} item - Rating item
@@ -854,6 +949,22 @@ async function createTopThreeCard(item, rank, type) {
               }</span>`
             : ''
         }
+        ${
+          item.mood && vibeColorsCache && vibeColorsCache[item.mood]
+            ? (() => {
+                const vibeColor = getVibeColor(item.mood);
+                let rgbString = '59, 130, 246';
+                if (vibeColor.startsWith('#')) {
+                  const hex = vibeColor.replace('#', '');
+                  const r = parseInt(hex.substring(0, 2), 16);
+                  const g = parseInt(hex.substring(2, 4), 16);
+                  const b = parseInt(hex.substring(4, 6), 16);
+                  rgbString = `${r}, ${g}, ${b}`;
+                }
+                return `<span class="top-three-mood"><span class="vibe-badge" style="--vibe-color: ${vibeColor}; --vibe-color-rgb: ${rgbString}">${item.mood}</span></span>`;
+              })()
+            : ''
+        }
       </div>
       <div class="top-three-stats">
         <div class="top-three-rating" style="color: ${getRatingColor(
@@ -904,6 +1015,25 @@ async function createTopThreeCard(item, rank, type) {
         </div>
       </div>
     `;
+  } else if (type === 'vibe') {
+    content = `
+      <div class="top-three-effect ${effect}"></div>
+      <div class="top-three-rank">${emoji}</div>
+      <div class="top-three-content">
+        <div class="top-three-position">#${rank}</div>
+        <h3 class="top-three-title">${item.vibe}</h3>
+        <p class="top-three-subtitle">${item.count} ${
+      item.count === 1 ? 'трек' : item.count < 5 ? 'трека' : 'треков'
+    }</p>
+      </div>
+      <div class="top-three-stats">
+        <div class="top-three-rating" style="color: ${getRatingColor(
+          item.avgRating
+        )}">
+          ${item.avgRating.toFixed(1)}
+        </div>
+      </div>
+    `;
   }
 
   card.innerHTML = content;
@@ -932,6 +1062,7 @@ function createRatingsTable(items, startRank, type) {
           <th class="title-col">Трек</th>
           <th class="artist-col">Исполнитель</th>
           <th class="genre-col">Жанр</th>
+          <th class="vibe-col">Настроение</th>
           <th class="rating-col">Рейтинг</th>
           <th class="weighted-rating-col" title="Взвешенный рейтинг (учитывает количество оценок)">Взвешенный</th>
           <th class="count-col">Оценок</th>
@@ -962,6 +1093,18 @@ function createRatingsTable(items, startRank, type) {
         </tr>
       </thead>
     `;
+  } else if (type === 'vibe') {
+    headerHTML = `
+      <thead>
+        <tr>
+          <th class="rank-col">#</th>
+          <th class="vibe-col">Настроение</th>
+          <th class="rating-col">Рейтинг</th>
+          <th class="weighted-rating-col" title="Взвешенный рейтинг (учитывает количество оценок)">Взвешенный</th>
+          <th class="count-col">Треков</th>
+        </tr>
+      </thead>
+    `;
   }
 
   const tbody = document.createElement('tbody');
@@ -970,11 +1113,31 @@ function createRatingsTable(items, startRank, type) {
     const rank = startRank + index;
 
     if (type === 'track') {
+      let vibeBadge = '—';
+      if (item.mood && item.mood.trim() !== '') {
+        const vibeColor = getVibeColor(item.mood);
+        // Convert hex color to RGB
+        let rgbString = '59, 130, 246'; // Default blue
+        if (vibeColor.startsWith('#')) {
+          const hex = vibeColor.replace('#', '');
+          const r = parseInt(hex.substring(0, 2), 16);
+          const g = parseInt(hex.substring(2, 4), 16);
+          const b = parseInt(hex.substring(4, 6), 16);
+          rgbString = `${r}, ${g}, ${b}`;
+        } else if (vibeColor.startsWith('rgb')) {
+          const rgb = vibeColor.match(/\d+/g);
+          if (rgb && rgb.length >= 3) {
+            rgbString = `${rgb[0]}, ${rgb[1]}, ${rgb[2]}`;
+          }
+        }
+        vibeBadge = `<span class="vibe-badge" style="--vibe-color: ${vibeColor}; --vibe-color-rgb: ${rgbString}">${item.mood}</span>`;
+      }
       row.innerHTML = `
         <td class="rank-col">${rank}</td>
         <td class="title-col">${item.title}</td>
         <td class="artist-col">${item.artist}</td>
         <td class="genre-col">${item.genre || '—'}</td>
+        <td class="vibe-col">${vibeBadge}</td>
         <td class="rating-col" style="color: ${getRatingColor(item.avgRating)}">
           ${item.avgRating.toFixed(1)}
         </td>
@@ -1025,6 +1188,39 @@ function createRatingsTable(items, startRank, type) {
         </td>
         <td class="count-col">${item.count}</td>
       `;
+    } else if (type === 'vibe') {
+      const vibeColor = getVibeColor(item.vibe);
+      // Convert hex color to RGB
+      let rgbString = '59, 130, 246'; // Default blue
+      if (vibeColor.startsWith('#')) {
+        const hex = vibeColor.replace('#', '');
+        const r = parseInt(hex.substring(0, 2), 16);
+        const g = parseInt(hex.substring(2, 4), 16);
+        const b = parseInt(hex.substring(4, 6), 16);
+        rgbString = `${r}, ${g}, ${b}`;
+      } else if (vibeColor.startsWith('rgb')) {
+        const rgb = vibeColor.match(/\d+/g);
+        if (rgb && rgb.length >= 3) {
+          rgbString = `${rgb[0]}, ${rgb[1]}, ${rgb[2]}`;
+        }
+      }
+      row.innerHTML = `
+        <td class="rank-col">${rank}</td>
+        <td class="vibe-col"><span class="vibe-badge" style="--vibe-color: ${vibeColor}; --vibe-color-rgb: ${rgbString}">${item.vibe}</span></td>
+        <td class="rating-col" style="color: ${getRatingColor(item.avgRating)}">
+          ${item.avgRating.toFixed(1)}
+        </td>
+        <td class="weighted-rating-col" style="color: ${getRatingColor(
+          item.weightedRating || item.avgRating
+        )}">
+          ${
+            item.weightedRating !== undefined
+              ? item.weightedRating.toFixed(1)
+              : '—'
+          }
+        </td>
+        <td class="count-col">${item.count}</td>
+      `;
     }
 
     tbody.appendChild(row);
@@ -1037,13 +1233,31 @@ function createRatingsTable(items, startRank, type) {
 }
 
 // Функция для получения цвета вайба
+// Cache for vibe colors
+let vibeColorsCache = null;
+
+// Load vibe colors from JSON file
+async function loadVibeColors() {
+  if (vibeColorsCache) {
+    return vibeColorsCache;
+  }
+  
+  try {
+    vibeColorsCache = await ipcRenderer.invoke('getVibes');
+    return vibeColorsCache;
+  } catch (e) {
+    console.error('Error reading vibes:', e);
+    return {};
+  }
+}
+
 function getVibeColor(vibe) {
-  const vibeColors = {
-    Спокойное: '#aed581',
-    Грустное: '#81d4fa',
-    Веселое: '#ffd54f',
-  };
-  return vibeColors[vibe] || '#e0e0e0';
+  // Use cached colors if available
+  if (vibeColorsCache && vibeColorsCache[vibe]) {
+    return vibeColorsCache[vibe];
+  }
+  
+  return '#e0e0e0'; // Default fallback
 }
 
 // Функция для получения цвета рейтинга на основе значения
@@ -1153,8 +1367,90 @@ document.addEventListener('click', (e) => {
 // Обновляем информацию о треке каждые 5 секунд
 setInterval(fetchCurrentTrack, 5000);
 
+// Load vibe buttons with recently used vibes
+async function loadVibeButtons() {
+  try {
+    // Refresh vibe colors cache
+    vibeColorsCache = await ipcRenderer.invoke('getVibes');
+    
+    const recentVibes = await ipcRenderer.invoke('getRecentVibes');
+    const vibeGrid = document.getElementById('vibe-buttons');
+    const addButton = document.getElementById('add-vibe-button');
+    
+    // Clear existing vibe buttons (except the add button)
+    const existingButtons = vibeGrid.querySelectorAll('.vibe-chip:not(.add-vibe)');
+    existingButtons.forEach(btn => btn.remove());
+    
+    // Show up to 5 vibes: recently used first, then fill with other available vibes
+    const vibesToShow = [];
+    const shownVibeNames = new Set();
+    
+    // Add recent vibes first (up to 5)
+    recentVibes.slice(0, 5).forEach(vibeName => {
+      if (vibeColorsCache[vibeName] && !shownVibeNames.has(vibeName)) {
+        vibesToShow.push({ name: vibeName, color: vibeColorsCache[vibeName] });
+        shownVibeNames.add(vibeName);
+      }
+    });
+    
+    // If we have less than 5, fill with other available vibes from vibes.json
+    // This ensures newly added moods appear even if they haven't been used yet
+    if (vibesToShow.length < 5 && vibeColorsCache) {
+      const allVibeNames = Object.keys(vibeColorsCache);
+      for (const vibeName of allVibeNames) {
+        if (vibesToShow.length >= 5) break;
+        if (!shownVibeNames.has(vibeName)) {
+          vibesToShow.push({ name: vibeName, color: vibeColorsCache[vibeName] });
+          shownVibeNames.add(vibeName);
+        }
+      }
+    }
+    
+    // Create buttons for vibes to show
+    vibesToShow.forEach(({ name, color }) => {
+      const vibeButton = document.createElement('button');
+      vibeButton.className = 'vibe-chip';
+      vibeButton.textContent = name;
+      vibeButton.setAttribute('data-vibe', name);
+      vibeButton.style.setProperty('--vibe-color', color);
+      
+      // Extract RGB values for glassmorphism - convert hex to RGB
+      let rgbString = '';
+      if (color.startsWith('#')) {
+        const hex = color.replace('#', '');
+        const r = parseInt(hex.substring(0, 2), 16);
+        const g = parseInt(hex.substring(2, 4), 16);
+        const b = parseInt(hex.substring(4, 6), 16);
+        rgbString = `${r}, ${g}, ${b}`;
+      } else if (color.startsWith('rgb')) {
+        const rgb = color.match(/\d+/g);
+        if (rgb && rgb.length >= 3) {
+          rgbString = `${rgb[0]}, ${rgb[1]}, ${rgb[2]}`;
+        }
+      }
+      if (rgbString) {
+        vibeButton.style.setProperty('--vibe-color-rgb', rgbString);
+      }
+      
+      vibeButton.addEventListener('click', () => {
+        document
+          .querySelectorAll('.vibe-chip:not(.add-vibe)')
+          .forEach((btn) => btn.classList.remove('active'));
+        vibeButton.classList.add('active');
+      });
+      
+      vibeGrid.insertBefore(vibeButton, addButton);
+    });
+  } catch (error) {
+    console.error('Ошибка при загрузке настроений:', error);
+  }
+}
+
 // Инициализация
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
+  // Load vibe colors cache first
+  await loadVibeColors();
+  await loadVibeButtons();
   fetchCurrentTrack();
 });
 

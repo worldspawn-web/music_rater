@@ -74,6 +74,17 @@
           </svg>
           <span>Жанры</span>
         </button>
+        <button class="nav-tab" data-tab="vibe-ratings">
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+          >
+            <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
+          </svg>
+          <span>Настроения</span>
+        </button>
       </div>
     </nav>
 
@@ -146,27 +157,7 @@
               <div class="vibe-selector">
                 <label class="input-label">Настроение</label>
                 <div class="vibe-grid" id="vibe-buttons">
-                  <button
-                    class="vibe-chip"
-                    data-vibe="Спокойное"
-                    style="--vibe-color: #10b981"
-                  >
-                    Спокойное
-                  </button>
-                  <button
-                    class="vibe-chip"
-                    data-vibe="Грустное"
-                    style="--vibe-color: #3b82f6"
-                  >
-                    Грустное
-                  </button>
-                  <button
-                    class="vibe-chip"
-                    data-vibe="Веселое"
-                    style="--vibe-color: #f59e0b"
-                  >
-                    Веселое
-                  </button>
+                  <!-- Vibe buttons will be loaded dynamically by loadVibeButtons() -->
                   <button class="vibe-chip add-vibe" id="add-vibe-button">
                     <svg
                       viewBox="0 0 24 24"
@@ -314,6 +305,37 @@
               <rect x="3" y="14" width="7" height="7" />
             </svg>
             <p>Пока нет оцененных жанров</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="tab-content" id="vibe-ratings">
+        <div class="ratings-container">
+          <header class="ratings-header">
+            <h1 class="ratings-title">Рейтинги настроений</h1>
+            <p class="ratings-subtitle">Ваши любимые настроения</p>
+          </header>
+
+          <!-- Vertical top 3 cards -->
+          <div class="top-three-container" id="vibe-top-three">
+            <!-- Will be populated by JS -->
+          </div>
+
+          <!-- Regular table for positions 4-100 -->
+          <div class="ratings-table-wrapper" id="vibe-ratings-table">
+            <!-- Will be populated by JS -->
+          </div>
+
+          <div class="empty-state hidden" id="vibe-ratings-empty">
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
+            </svg>
+            <p>Пока нет оцененных настроений</p>
           </div>
         </div>
       </section>
