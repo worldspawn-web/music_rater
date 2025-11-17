@@ -698,8 +698,8 @@ async function addVibe(name, color) {
     if (result.success) {
       // Clear cache to force reload
       vibeColorsCache = null;
-      // Reload vibe buttons to include the new one
-      await loadVibeButtons();
+      // Reload vibe buttons to include the new one, passing the newly added vibe name
+      await loadVibeButtons(name);
     } else {
       alert(result.message || 'Ошибка при сохранении настроения');
     }
@@ -1477,8 +1477,11 @@ document.addEventListener('click', (e) => {
 // Обновляем информацию о треке каждые 5 секунд
 setInterval(fetchCurrentTrack, 5000);
 
+// Track if all vibes are expanded
+let vibesExpanded = false;
+
 // Load vibe buttons with recently used vibes
-async function loadVibeButtons() {
+async function loadVibeButtons(newlyAddedVibe = null, showAll = false) {
   try {
     // Refresh vibe colors cache
     vibeColorsCache = await ipcRenderer.invoke('getVibes');
@@ -1486,34 +1489,68 @@ async function loadVibeButtons() {
     const recentVibes = await ipcRenderer.invoke('getRecentVibes');
     const vibeGrid = document.getElementById('vibe-buttons');
     const addButton = document.getElementById('add-vibe-button');
+    const expandBtn = document.getElementById('vibe-expand-btn');
     
     // Clear existing vibe buttons (except the add button)
     const existingButtons = vibeGrid.querySelectorAll('.vibe-chip:not(.add-vibe)');
     existingButtons.forEach(btn => btn.remove());
     
-    // Show up to 5 vibes: recently used first, then fill with other available vibes
-    const vibesToShow = [];
+    // Get all available vibes
+    const allAvailableVibes = [];
+    if (vibeColorsCache) {
+      Object.keys(vibeColorsCache).forEach(vibeName => {
+        allAvailableVibes.push({ name: vibeName, color: vibeColorsCache[vibeName] });
+      });
+    }
+    
+    // Show/hide expand button based on number of vibes
+    if (allAvailableVibes.length > 5) {
+      expandBtn.classList.remove('hidden');
+    } else {
+      expandBtn.classList.add('hidden');
+    }
+    
+    let vibesToShow = [];
     const shownVibeNames = new Set();
     
-    // Add recent vibes first (up to 5)
-    recentVibes.slice(0, 5).forEach(vibeName => {
-      if (vibeColorsCache[vibeName] && !shownVibeNames.has(vibeName)) {
-        vibesToShow.push({ name: vibeName, color: vibeColorsCache[vibeName] });
-        shownVibeNames.add(vibeName);
+    if (showAll || vibesExpanded) {
+      // Show all vibes
+      vibesToShow = allAvailableVibes;
+      expandBtn.classList.add('expanded');
+      expandBtn.setAttribute('title', 'Скрыть лишние настроения');
+    } else {
+      // Show up to 5 vibes: newly added first (if provided), then recently used, then fill with other available vibes
+      
+      // If a vibe was just added, prioritize it first
+      if (newlyAddedVibe && vibeColorsCache[newlyAddedVibe]) {
+        vibesToShow.push({ name: newlyAddedVibe, color: vibeColorsCache[newlyAddedVibe] });
+        shownVibeNames.add(newlyAddedVibe);
       }
-    });
-    
-    // If we have less than 5, fill with other available vibes from vibes.json
-    // This ensures newly added moods appear even if they haven't been used yet
-    if (vibesToShow.length < 5 && vibeColorsCache) {
-      const allVibeNames = Object.keys(vibeColorsCache);
-      for (const vibeName of allVibeNames) {
-        if (vibesToShow.length >= 5) break;
-        if (!shownVibeNames.has(vibeName)) {
+      
+      // Add recent vibes (up to remaining slots, but skip if it's the newly added one)
+      const remainingSlots = 5 - vibesToShow.length;
+      recentVibes.slice(0, remainingSlots).forEach(vibeName => {
+        if (vibeColorsCache[vibeName] && !shownVibeNames.has(vibeName)) {
           vibesToShow.push({ name: vibeName, color: vibeColorsCache[vibeName] });
           shownVibeNames.add(vibeName);
         }
+      });
+      
+      // If we have less than 5, fill with other available vibes from vibes.json
+      // This ensures newly added moods appear even if they haven't been used yet
+      if (vibesToShow.length < 5 && vibeColorsCache) {
+        const allVibeNames = Object.keys(vibeColorsCache);
+        for (const vibeName of allVibeNames) {
+          if (vibesToShow.length >= 5) break;
+          if (!shownVibeNames.has(vibeName)) {
+            vibesToShow.push({ name: vibeName, color: vibeColorsCache[vibeName] });
+            shownVibeNames.add(vibeName);
+          }
+        }
       }
+      
+      expandBtn.classList.remove('expanded');
+      expandBtn.setAttribute('title', 'Показать все настроения');
     }
     
     // Create buttons for vibes to show
@@ -1555,6 +1592,12 @@ async function loadVibeButtons() {
     console.error('Ошибка при загрузке настроений:', error);
   }
 }
+
+// Toggle expand/collapse all vibes
+document.getElementById('vibe-expand-btn').addEventListener('click', () => {
+  vibesExpanded = !vibesExpanded;
+  loadVibeButtons(null, vibesExpanded);
+});
 
 // Инициализация
 document.addEventListener('DOMContentLoaded', async () => {

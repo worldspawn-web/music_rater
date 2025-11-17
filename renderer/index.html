@@ -167,7 +167,19 @@
               </div>
 
               <div class="vibe-selector">
-                <label class="input-label">Настроение</label>
+                <div class="vibe-selector-header">
+                  <label class="input-label">Настроение</label>
+                  <button class="vibe-expand-btn hidden" id="vibe-expand-btn" title="Показать все настроения">
+                    <svg
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2"
+                    >
+                      <polyline points="6 9 12 15 18 9"></polyline>
+                    </svg>
+                  </button>
+                </div>
                 <div class="vibe-grid" id="vibe-buttons">
                   <!-- Vibe buttons will be loaded dynamically by loadVibeButtons() -->
                   <button class="vibe-chip add-vibe" id="add-vibe-button">
