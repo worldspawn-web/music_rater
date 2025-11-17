@@ -200,6 +200,66 @@ function parseArtists(artistString) {
 }
 
 /**
+ * Updates the multi-artist display with ratings and dropdown
+ * @param {HTMLElement} artistElement - The artist element to update
+ * @param {Array<string>} artists - Array of artist names
+ * @param {Array} artistRatingData - Array of rating objects for each artist
+ */
+function updateMultiArtistDisplay(artistElement, artists, artistRatingData) {
+  const avgRating =
+    artistRatingData.reduce((sum, r) => sum + r.avgRating, 0) /
+    artistRatingData.length;
+  const ratingColor = getRatingColor(avgRating);
+
+  // Create or get expand button
+  let expandBtn = artistElement.querySelector('.artist-expand-btn');
+  if (!expandBtn) {
+    expandBtn = document.createElement('button');
+    expandBtn.className = 'artist-expand-btn';
+    expandBtn.innerHTML =
+      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg>';
+    expandBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const dropdown = artistElement.querySelector('.artist-ratings-dropdown');
+      if (dropdown) {
+        dropdown.classList.toggle('visible');
+        expandBtn.classList.toggle('expanded');
+      }
+    });
+  }
+
+  // Create or get dropdown
+  let dropdown = artistElement.querySelector('.artist-ratings-dropdown');
+  if (!dropdown) {
+    dropdown = document.createElement('div');
+    dropdown.className = 'artist-ratings-dropdown';
+  }
+
+  // Update dropdown content
+  dropdown.innerHTML = artistRatingData
+    .map((rating) => {
+      const color = getRatingColor(rating.avgRating);
+      return `<div class="artist-rating-item">
+        <span class="artist-rating-name">${rating.artist}</span>
+        <span class="artist-rating-value" style="color: ${color};">${rating.avgRating.toFixed(
+        1
+      )}</span>
+      </div>`;
+    })
+    .join('');
+
+  // Update main display
+  artistElement.innerHTML = `
+    <span class="artist-names">${artists.join(', ')}</span>
+    <span class="artist-rating" style="color: ${ratingColor}; font-weight: 700; margin-left: 0.5rem;">${avgRating.toFixed(
+    1
+  )}</span>
+  `;
+  artistElement.appendChild(expandBtn);
+  artistElement.appendChild(dropdown);
+}
+
+/**
  * Показывает состояние, когда сейчас ничего не играет
  */
 function showNoTrackPlaying() {
@@ -459,8 +519,66 @@ document.querySelectorAll('.rating-button').forEach((button) => {
         loadGenreDropdown(); // Call loadGenreDropdown to update genre list
         document.getElementById('genre-select').value = genre;
 
-        // Refresh artist display (handles both single and multiple artists)
-        await fetchCurrentTrack();
+        // Get old ratings before updating
+        const artistElement = document.getElementById('track-artist');
+        const oldRatingSpan = artistElement.querySelector('.artist-rating');
+        const oldRating = oldRatingSpan
+          ? Number.parseFloat(oldRatingSpan.textContent)
+          : null;
+
+        // Get new artist ratings
+        const artistRatings = await ipcRenderer.invoke('getArtistRatings');
+        const artists = parseArtists(trackArtist);
+
+        if (artists.length === 1) {
+          // Single artist - animate rating change
+          const artistRating = artistRatings.find((r) => r.artist === artists[0]);
+          if (artistRating) {
+            if (oldRating !== null && oldRating !== artistRating.avgRating) {
+              // Animate the change
+              animateRatingChange(artistElement, oldRating, artistRating.avgRating);
+            } else {
+              // Just update without animation
+              const ratingColor = getRatingColor(artistRating.avgRating);
+              artistElement.innerHTML = `${
+                artists[0]
+              } <span class="artist-rating" style="color: ${ratingColor}; font-weight: 700; margin-left: 0.5rem;">${artistRating.avgRating.toFixed(
+                1
+              )}</span>`;
+            }
+          }
+        } else {
+          // Multiple artists - calculate average and animate
+          const artistRatingData = artists
+            .map((artistName) => {
+              return artistRatings.find((r) => r.artist === artistName);
+            })
+            .filter((r) => r !== undefined);
+
+          if (artistRatingData.length > 0) {
+            const newAvgRating =
+              artistRatingData.reduce((sum, r) => sum + r.avgRating, 0) /
+              artistRatingData.length;
+
+            // First, set up the display structure
+            updateMultiArtistDisplay(artistElement, artists, artistRatingData);
+
+            // Then animate if rating changed
+            if (oldRating !== null && oldRating !== newAvgRating) {
+              // Small delay to ensure DOM is updated
+              setTimeout(() => {
+                animateRatingChange(artistElement, oldRating, newAvgRating);
+              }, 50);
+            }
+          } else {
+            // No ratings yet, just show artist names
+            artistElement.innerHTML = `<span class="artist-names">${artists.join(', ')}</span>`;
+            const expandBtn = artistElement.querySelector('.artist-expand-btn');
+            const dropdown = artistElement.querySelector('.artist-ratings-dropdown');
+            if (expandBtn) expandBtn.remove();
+            if (dropdown) dropdown.remove();
+          }
+        }
       } else {
         alert(result.message);
       }
