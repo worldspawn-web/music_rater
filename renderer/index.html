@@ -74,6 +74,18 @@
           </svg>
           <span>Жанры</span>
         </button>
+        <button class="nav-tab" data-tab="album-ratings">
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+          >
+            <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+            <path d="M9 3v18M15 3v18M3 9h18M3 15h18" />
+          </svg>
+          <span>Альбомы</span>
+        </button>
         <button class="nav-tab" data-tab="vibe-ratings">
           <svg
             viewBox="0 0 24 24"
@@ -305,6 +317,38 @@
               <rect x="3" y="14" width="7" height="7" />
             </svg>
             <p>Пока нет оцененных жанров</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="tab-content" id="album-ratings">
+        <div class="ratings-container">
+          <header class="ratings-header">
+            <h1 class="ratings-title">Рейтинги альбомов</h1>
+            <p class="ratings-subtitle">Ваши любимые альбомы</p>
+          </header>
+
+          <!-- Vertical top 3 cards -->
+          <div class="top-three-container" id="album-top-three">
+            <!-- Will be populated by JS -->
+          </div>
+
+          <!-- Regular table for positions 4-25 -->
+          <div class="ratings-table-wrapper" id="album-ratings-table">
+            <!-- Will be populated by JS -->
+          </div>
+
+          <div class="empty-state hidden" id="album-ratings-empty">
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+              <path d="M9 3v18M15 3v18M3 9h18M3 15h18" />
+            </svg>
+            <p>Пока нет оцененных альбомов</p>
           </div>
         </div>
       </section>

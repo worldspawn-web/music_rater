@@ -21,6 +21,8 @@ document.querySelectorAll('.nav-tab').forEach((button) => {
       loadArtistRatings();
     } else if (button.getAttribute('data-tab') === 'genre-ratings') {
       loadGenreRatings();
+    } else if (button.getAttribute('data-tab') === 'album-ratings') {
+      loadAlbumRatings();
     } else if (button.getAttribute('data-tab') === 'vibe-ratings') {
       loadVibeRatings();
     }
@@ -827,6 +829,46 @@ async function loadGenreRatings() {
   }
 }
 
+// Загрузка рейтингов альбомов
+async function loadAlbumRatings() {
+  try {
+    const ratings = await ipcRenderer.invoke('getAlbumRatings');
+    const topThree = document.getElementById('album-top-three');
+    const table = document.getElementById('album-ratings-table');
+    const emptyState = document.getElementById('album-ratings-empty');
+
+    topThree.innerHTML = '';
+    table.innerHTML = '';
+
+    if (ratings.length === 0) {
+      emptyState.classList.remove('hidden');
+      topThree.style.display = 'none';
+      table.style.display = 'none';
+      return;
+    }
+
+    emptyState.classList.add('hidden');
+    topThree.style.display = 'flex';
+    table.style.display = 'block';
+
+    // Show only top 25 albums
+    const limitedRatings = ratings.slice(0, 25);
+    const top3 = limitedRatings.slice(0, 3);
+    const rest = limitedRatings.slice(3);
+
+    for (let i = 0; i < top3.length; i++) {
+      const card = await createTopThreeCard(top3[i], i + 1, 'album');
+      topThree.appendChild(card);
+    }
+
+    if (rest.length > 0) {
+      table.appendChild(createRatingsTable(rest, 4, 'album'));
+    }
+  } catch (error) {
+    console.error('Ошибка при загрузке рейтингов альбомов:', error);
+  }
+}
+
 // Загрузка рейтингов настроений
 async function loadVibeRatings() {
   try {
@@ -977,6 +1019,35 @@ async function createTopThreeCard(item, rank, type) {
     }</div>
       </div>
     `;
+  } else if (type === 'album') {
+    const coverPath = item.coverPath
+      ? `../${item.coverPath}?t=${Date.now()}`
+      : '../covers/placeholder.png';
+
+    content = `
+      <div class="top-three-effect ${effect}"></div>
+      <div class="top-three-rank">${emoji}</div>
+      <div class="top-three-cover">
+        <img src="${coverPath}" alt="${
+      item.album
+    }" onerror="this.style.display='none'" />
+      </div>
+      <div class="top-three-content">
+        <div class="top-three-position">#${rank}</div>
+        <h3 class="top-three-title">${item.album}</h3>
+        <p class="top-three-subtitle">${item.artist}</p>
+      </div>
+      <div class="top-three-stats">
+        <div class="top-three-rating" style="color: ${getRatingColor(
+          item.avgRating
+        )}">
+          ${item.avgRating.toFixed(1)}
+        </div>
+        <div class="top-three-count">${item.count} ${
+      item.count === 1 ? 'трек' : item.count < 5 ? 'трека' : 'треков'
+    }</div>
+      </div>
+    `;
   } else if (type === 'artist') {
     content = `
       <div class="top-three-effect ${effect}"></div>
@@ -1093,6 +1164,20 @@ function createRatingsTable(items, startRank, type) {
         </tr>
       </thead>
     `;
+  } else if (type === 'album') {
+    headerHTML = `
+      <thead>
+        <tr>
+          <th class="rank-col">#</th>
+          <th class="album-cover-col">Обложка</th>
+          <th class="album-col">Альбом</th>
+          <th class="artist-col">Исполнитель</th>
+          <th class="rating-col">Рейтинг</th>
+          <th class="weighted-rating-col" title="Взвешенный рейтинг (учитывает количество оценок)">Взвешенный</th>
+          <th class="count-col">Треков</th>
+        </tr>
+      </thead>
+    `;
   } else if (type === 'vibe') {
     headerHTML = `
       <thead>
@@ -1174,6 +1259,31 @@ function createRatingsTable(items, startRank, type) {
       row.innerHTML = `
         <td class="rank-col">${rank}</td>
         <td class="genre-col">${item.genre}</td>
+        <td class="rating-col" style="color: ${getRatingColor(item.avgRating)}">
+          ${item.avgRating.toFixed(1)}
+        </td>
+        <td class="weighted-rating-col" style="color: ${getRatingColor(
+          item.weightedRating || item.avgRating
+        )}">
+          ${
+            item.weightedRating !== undefined
+              ? item.weightedRating.toFixed(1)
+              : '—'
+          }
+        </td>
+        <td class="count-col">${item.count}</td>
+      `;
+    } else if (type === 'album') {
+      const coverPath = item.coverPath
+        ? `../${item.coverPath}?t=${Date.now()}`
+        : '../covers/placeholder.png';
+      row.innerHTML = `
+        <td class="rank-col">${rank}</td>
+        <td class="album-cover-col">
+          <img src="${coverPath}" alt="${item.album}" class="album-cover-thumb" onerror="this.src='../covers/placeholder.png'" />
+        </td>
+        <td class="album-col">${item.album}</td>
+        <td class="artist-col">${item.artist}</td>
         <td class="rating-col" style="color: ${getRatingColor(item.avgRating)}">
           ${item.avgRating.toFixed(1)}
         </td>

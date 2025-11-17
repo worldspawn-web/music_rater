@@ -916,6 +916,91 @@ class RatingService {
   }
 
   /**
+   * Gets aggregated album ratings with Bayesian weighted scoring
+   * @returns {Promise<Array>} Array of album ratings with weighted averages
+   */
+  static async getAlbumRatings() {
+    const data = await this.getAllRatings();
+    const albumMap = new Map();
+
+    data.tracks.forEach((track) => {
+      if (!track.album) return;
+
+      const albumKey = `${track.album}|||${track.artist}`; // Use album+artist as unique key
+
+      if (!albumMap.has(albumKey)) {
+        albumMap.set(albumKey, {
+          album: track.album,
+          artist: track.artist,
+          ratings: [],
+          coverPath: null, // Will be set from track if available
+        });
+      }
+
+      // Set coverPath from track if not already set
+      const albumEntry = albumMap.get(albumKey);
+      if (!albumEntry.coverPath && track.coverPath) {
+        albumEntry.coverPath = track.coverPath;
+      }
+
+      track.ratings.forEach((rating) => {
+        albumEntry.ratings.push(rating.rating);
+      });
+    });
+
+    const albums = Array.from(albumMap.values());
+
+    // Calculate global average across all albums
+    const globalAvg = this.calculateGlobalAverage(albums);
+    const minRatings = 3; // Minimum ratings for trustworthy score
+
+    const albumRatings = albums.map((album) => {
+      const avgRating =
+        album.ratings.reduce((sum, r) => sum + r, 0) / album.ratings.length;
+      const count = album.ratings.length;
+
+      // Calculate weighted rating (trustworthy score)
+      const weightedRating = this.calculateWeightedRating(
+        avgRating,
+        count,
+        globalAvg,
+        minRatings
+      );
+
+      // Try to find cover path from any track in this album
+      let coverPath = album.coverPath;
+      if (!coverPath) {
+        // Look for a track with this album to get the cover path
+        const trackWithCover = data.tracks.find(
+          (t) => t.album === album.album && t.artist === album.artist
+        );
+        if (trackWithCover && trackWithCover.coverPath) {
+          coverPath = trackWithCover.coverPath;
+        } else {
+          coverPath = `covers/${sanitizeFilename(album.album)}.png`;
+        }
+      }
+
+      return {
+        album: album.album,
+        artist: album.artist,
+        avgRating,
+        weightedRating,
+        count,
+        coverPath,
+      };
+    });
+
+    // Sort by weighted rating (trustworthy score), then by count, then by avgRating
+    return albumRatings.sort(
+      (a, b) =>
+        b.weightedRating - a.weightedRating ||
+        b.count - a.count ||
+        b.avgRating - a.avgRating
+    );
+  }
+
+  /**
    * Gets aggregated vibe ratings with Bayesian weighted scoring
    * @returns {Promise<Array>} Array of vibe ratings with weighted averages
    */
@@ -1122,6 +1207,16 @@ function registerIpcHandlers() {
       return await RatingService.getGenreRatings();
     } catch (error) {
       console.error('IPC Error - getGenreRatings:', error);
+      return [];
+    }
+  });
+
+  // Get album ratings
+  ipcMain.handle('getAlbumRatings', async () => {
+    try {
+      return await RatingService.getAlbumRatings();
+    } catch (error) {
+      console.error('IPC Error - getAlbumRatings:', error);
       return [];
     }
   });
