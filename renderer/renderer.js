@@ -181,12 +181,24 @@ const FlagUtils = window.FlagUtils || {
 };
 
 // Create local references to avoid typing FlagUtils. everywhere
-const getFlagEmoji = FlagUtils.getFlagEmoji.bind(FlagUtils);
-const getCountryName = FlagUtils.getCountryName.bind(FlagUtils);
-const searchCountries = FlagUtils.searchCountries.bind(FlagUtils);
-const getUsedFlagCountries = FlagUtils.getUsedFlagCountries.bind(FlagUtils);
-const ALL_COUNTRIES = FlagUtils.ALL_COUNTRIES || [];
-const CUSTOM_FLAGS = FlagUtils.CUSTOM_FLAGS || {};
+const getFlagEmoji = FlagUtils && typeof FlagUtils.getFlagEmoji === 'function' 
+  ? FlagUtils.getFlagEmoji.bind(FlagUtils) 
+  : (code) => {
+      if (!code) return '';
+      const codePoints = code.toUpperCase().split('').map(char => 127397 + char.charCodeAt(0));
+      return String.fromCodePoint(...codePoints);
+    };
+const getCountryName = FlagUtils && typeof FlagUtils.getCountryName === 'function'
+  ? FlagUtils.getCountryName.bind(FlagUtils)
+  : (code) => code || '';
+const searchCountries = FlagUtils && typeof FlagUtils.searchCountries === 'function'
+  ? FlagUtils.searchCountries.bind(FlagUtils)
+  : () => [];
+const getUsedFlagCountries = FlagUtils && typeof FlagUtils.getUsedFlagCountries === 'function'
+  ? FlagUtils.getUsedFlagCountries.bind(FlagUtils)
+  : async () => [];
+const ALL_COUNTRIES = (FlagUtils && FlagUtils.ALL_COUNTRIES) || [];
+const CUSTOM_FLAGS = (FlagUtils && FlagUtils.CUSTOM_FLAGS) || {};
 
 function parseArtists(artistString) {
   if (!artistString || typeof artistString !== 'string') {
@@ -379,9 +391,26 @@ async function fetchCurrentTrack() {
       
       // Get artist flag
       const artistFlag = await ipcRenderer.invoke('getArtistFlag', artists[0]);
-      const flagEmoji = artistFlag ? getFlagEmoji(artistFlag) : '';
+      let flagEmoji = '';
+      if (artistFlag && typeof getFlagEmoji === 'function') {
+        try {
+          flagEmoji = getFlagEmoji(artistFlag);
+        } catch (e) {
+          console.error('Error calling getFlagEmoji:', e);
+        }
+      }
       
-      console.log('Artist flag check:', { artist: artists[0], flag: artistFlag, emoji: flagEmoji });
+      // Debug logging
+      if (artistFlag) {
+        console.log('Artist flag found:', { 
+          artist: artists[0], 
+          flag: artistFlag, 
+          emoji: flagEmoji,
+          emojiLength: flagEmoji.length,
+          FlagUtilsAvailable: !!window.FlagUtils,
+          getFlagEmojiType: typeof getFlagEmoji
+        });
+      }
 
       if (artistRating) {
         const ratingColor = getRatingColor(artistRating.avgRating);
@@ -648,18 +677,88 @@ document.querySelectorAll('.rating-button').forEach((button) => {
         if (artists.length === 1) {
           // Single artist - animate rating change
           const artistRating = artistRatings.find((r) => r.artist === artists[0]);
+          
+          // Get artist flag
+          const artistFlag = await ipcRenderer.invoke('getArtistFlag', artists[0]);
+          let flagEmoji = '';
+          if (artistFlag && typeof getFlagEmoji === 'function') {
+            try {
+              flagEmoji = getFlagEmoji(artistFlag);
+            } catch (e) {
+              console.error('Error calling getFlagEmoji:', e);
+            }
+          }
+          
           if (artistRating) {
+            const ratingColor = getRatingColor(artistRating.avgRating);
+            const flagHtml = flagEmoji ? `<span class="artist-flag">${flagEmoji}</span>` : '';
+            
             if (oldRating !== null && oldRating !== artistRating.avgRating) {
-              // Animate the change
+              // Update content with flag first
+              artistElement.innerHTML = `
+                ${flagHtml}
+                <span class="artist-name">${artists[0]}</span>
+                <span class="artist-rating" style="color: ${ratingColor}; font-weight: 700; margin-left: 0.5rem;">${artistRating.avgRating.toFixed(1)}</span>
+                <button class="artist-flag-btn" title="Изменить флаг исполнителя">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+                  </svg>
+                </button>
+              `;
+              
+              // Re-attach flag button handler
+              const flagBtn = artistElement.querySelector('.artist-flag-btn');
+              if (flagBtn) {
+                flagBtn.addEventListener('click', (e) => {
+                  e.stopPropagation();
+                  showFlagSelector(artists[0], artistElement);
+                });
+              }
+              
+              // Then animate the change
               animateRatingChange(artistElement, oldRating, artistRating.avgRating);
             } else {
               // Just update without animation
-              const ratingColor = getRatingColor(artistRating.avgRating);
-              artistElement.innerHTML = `${
-                artists[0]
-              } <span class="artist-rating" style="color: ${ratingColor}; font-weight: 700; margin-left: 0.5rem;">${artistRating.avgRating.toFixed(
-                1
-              )}</span>`;
+              artistElement.innerHTML = `
+                ${flagHtml}
+                <span class="artist-name">${artists[0]}</span>
+                <span class="artist-rating" style="color: ${ratingColor}; font-weight: 700; margin-left: 0.5rem;">${artistRating.avgRating.toFixed(1)}</span>
+                <button class="artist-flag-btn" title="Изменить флаг исполнителя">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+                  </svg>
+                </button>
+              `;
+              
+              // Re-attach flag button handler
+              const flagBtn = artistElement.querySelector('.artist-flag-btn');
+              if (flagBtn) {
+                flagBtn.addEventListener('click', (e) => {
+                  e.stopPropagation();
+                  showFlagSelector(artists[0], artistElement);
+                });
+              }
+            }
+          } else {
+            // No rating yet, show artist name with flag
+            const flagHtml = flagEmoji ? `<span class="artist-flag">${flagEmoji}</span>` : '';
+            artistElement.innerHTML = `
+              ${flagHtml}
+              <span class="artist-name">${artists[0]}</span>
+              <button class="artist-flag-btn" title="Добавить флаг исполнителя">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+                </svg>
+              </button>
+            `;
+            
+            // Re-attach flag button handler
+            const flagBtn = artistElement.querySelector('.artist-flag-btn');
+            if (flagBtn) {
+              flagBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                showFlagSelector(artists[0], artistElement);
+              });
             }
           }
         } else {
@@ -1921,6 +2020,13 @@ function attachFlagSelectionHandlers(modal, artistName, closeModal) {
 
 // Инициализация
 document.addEventListener('DOMContentLoaded', async () => {
+  // Verify FlagUtils is loaded
+  if (!window.FlagUtils) {
+    console.error('FlagUtils not loaded! Check flag-utils.js');
+  } else {
+    console.log('FlagUtils loaded:', Object.keys(window.FlagUtils));
+  }
+  
   // Load vibe colors cache first
   await loadVibeColors();
   await loadVibeButtons();

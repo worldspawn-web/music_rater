@@ -1301,7 +1301,12 @@ function registerIpcHandlers() {
   ipcMain.handle('getArtistFlag', async (event, artistName) => {
     try {
       const flags = await readJsonFile(CONSTANTS.PATHS.ARTIST_FLAGS, {});
-      return flags[artistName] || null;
+      const flag = flags[artistName] || null;
+      if (!flag && artistName) {
+        // Debug: log if flag not found to help identify name mismatches
+        console.log(`Flag not found for artist: "${artistName}". Available artists:`, Object.keys(flags));
+      }
+      return flag;
     } catch (error) {
       console.error('IPC Error - getArtistFlag:', error);
       return null;
