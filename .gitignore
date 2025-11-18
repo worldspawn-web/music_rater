@@ -17,8 +17,11 @@ logs/
 # Packages
 /node_modules
 
-# Other
+# App Data
 covers/
+ratings.json
+vibes.json
+artist-flags.json
 
 # Builds
 dist/
