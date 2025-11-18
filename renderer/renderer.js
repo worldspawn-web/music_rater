@@ -161,6 +161,73 @@ function normalizeTrackField(value) {
  * @param {string} artistString - Artist string that may contain multiple artists
  * @returns {Array<string>} Array of individual artist names
  */
+// Country code to flag emoji mapping
+function getFlagEmoji(countryCode) {
+  if (!countryCode) return '';
+  // Convert country code (e.g., 'US', 'RU') to flag emoji
+  const codePoints = countryCode
+    .toUpperCase()
+    .split('')
+    .map(char => 127397 + char.charCodeAt(0));
+  return String.fromCodePoint(...codePoints);
+}
+
+// Common countries for flag selector
+const COMMON_COUNTRIES = [
+  { code: 'US', name: 'United States' },
+  { code: 'GB', name: 'United Kingdom' },
+  { code: 'RU', name: 'Russia' },
+  { code: 'DE', name: 'Germany' },
+  { code: 'FR', name: 'France' },
+  { code: 'IT', name: 'Italy' },
+  { code: 'ES', name: 'Spain' },
+  { code: 'JP', name: 'Japan' },
+  { code: 'KR', name: 'South Korea' },
+  { code: 'CN', name: 'China' },
+  { code: 'CA', name: 'Canada' },
+  { code: 'AU', name: 'Australia' },
+  { code: 'BR', name: 'Brazil' },
+  { code: 'MX', name: 'Mexico' },
+  { code: 'AR', name: 'Argentina' },
+  { code: 'SE', name: 'Sweden' },
+  { code: 'NO', name: 'Norway' },
+  { code: 'DK', name: 'Denmark' },
+  { code: 'FI', name: 'Finland' },
+  { code: 'NL', name: 'Netherlands' },
+  { code: 'BE', name: 'Belgium' },
+  { code: 'PL', name: 'Poland' },
+  { code: 'UA', name: 'Ukraine' },
+  { code: 'TR', name: 'Turkey' },
+  { code: 'IN', name: 'India' },
+  { code: 'ID', name: 'Indonesia' },
+  { code: 'PH', name: 'Philippines' },
+  { code: 'TH', name: 'Thailand' },
+  { code: 'VN', name: 'Vietnam' },
+  { code: 'NZ', name: 'New Zealand' },
+  { code: 'IE', name: 'Ireland' },
+  { code: 'PT', name: 'Portugal' },
+  { code: 'GR', name: 'Greece' },
+  { code: 'CH', name: 'Switzerland' },
+  { code: 'AT', name: 'Austria' },
+  { code: 'CZ', name: 'Czech Republic' },
+  { code: 'HU', name: 'Hungary' },
+  { code: 'RO', name: 'Romania' },
+  { code: 'BG', name: 'Bulgaria' },
+  { code: 'HR', name: 'Croatia' },
+  { code: 'RS', name: 'Serbia' },
+  { code: 'SI', name: 'Slovenia' },
+  { code: 'SK', name: 'Slovakia' },
+  { code: 'EE', name: 'Estonia' },
+  { code: 'LV', name: 'Latvia' },
+  { code: 'LT', name: 'Lithuania' },
+  { code: 'IS', name: 'Iceland' },
+  { code: 'ZA', name: 'South Africa' },
+  { code: 'EG', name: 'Egypt' },
+  { code: 'IL', name: 'Israel' },
+  { code: 'AE', name: 'UAE' },
+  { code: 'SA', name: 'Saudi Arabia' },
+];
+
 function parseArtists(artistString) {
   if (!artistString || typeof artistString !== 'string') {
     return [];
@@ -209,7 +276,7 @@ function parseArtists(artistString) {
  * @param {Array<string>} artists - Array of artist names
  * @param {Array} artistRatingData - Array of rating objects for each artist
  */
-function updateMultiArtistDisplay(artistElement, artists, artistRatingData) {
+async function updateMultiArtistDisplay(artistElement, artists, artistRatingData) {
   const avgRating =
     artistRatingData.reduce((sum, r) => sum + r.avgRating, 0) /
     artistRatingData.length;
@@ -239,18 +306,19 @@ function updateMultiArtistDisplay(artistElement, artists, artistRatingData) {
     dropdown.className = 'artist-ratings-dropdown';
   }
 
-  // Update dropdown content
-  dropdown.innerHTML = artistRatingData
-    .map((rating) => {
+  // Update dropdown content with flags
+  dropdown.innerHTML = await Promise.all(
+    artistRatingData.map(async (rating) => {
       const color = getRatingColor(rating.avgRating);
+      const artistFlag = await ipcRenderer.invoke('getArtistFlag', rating.artist);
+      const flagEmoji = artistFlag ? getFlagEmoji(artistFlag) : '';
       return `<div class="artist-rating-item">
+        ${flagEmoji ? `<span class="artist-flag-small">${flagEmoji}</span>` : ''}
         <span class="artist-rating-name">${rating.artist}</span>
-        <span class="artist-rating-value" style="color: ${color};">${rating.avgRating.toFixed(
-        1
-      )}</span>
+        <span class="artist-rating-value" style="color: ${color};">${rating.avgRating.toFixed(1)}</span>
       </div>`;
     })
-    .join('');
+  ).then(html => html.join(''));
 
   // Update main display
   artistElement.innerHTML = `
@@ -348,17 +416,46 @@ async function fetchCurrentTrack() {
       const artistRating = artistRatings.find(
         (r) => r.artist === artists[0]
       );
+      
+      // Get artist flag
+      const artistFlag = await ipcRenderer.invoke('getArtistFlag', artists[0]);
+      const flagEmoji = artistFlag ? getFlagEmoji(artistFlag) : '';
+      
+      console.log('Artist flag check:', { artist: artists[0], flag: artistFlag, emoji: flagEmoji });
 
       if (artistRating) {
         const ratingColor = getRatingColor(artistRating.avgRating);
-        artistElement.innerHTML = `${
-          artists[0]
-        } <span class="artist-rating" style="color: ${ratingColor}; font-weight: 700; margin-left: 0.5rem;">${artistRating.avgRating.toFixed(
-          1
-        )}</span>`;
+        artistElement.innerHTML = `
+          ${flagEmoji ? `<span class="artist-flag">${flagEmoji}</span>` : ''}
+          <span class="artist-name">${artists[0]}</span>
+          <span class="artist-rating" style="color: ${ratingColor}; font-weight: 700; margin-left: 0.5rem;">${artistRating.avgRating.toFixed(1)}</span>
+          <button class="artist-flag-btn" title="Изменить флаг исполнителя">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+            </svg>
+          </button>
+        `;
       } else {
-        artistElement.textContent = artists[0];
+        artistElement.innerHTML = `
+          ${flagEmoji ? `<span class="artist-flag">${flagEmoji}</span>` : ''}
+          <span class="artist-name">${artists[0]}</span>
+          <button class="artist-flag-btn" title="Добавить флаг исполнителя">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+            </svg>
+          </button>
+        `;
       }
+      
+      // Add click handler for flag button
+      const flagBtn = artistElement.querySelector('.artist-flag-btn');
+      if (flagBtn) {
+        flagBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          showFlagSelector(artists[0], artistElement);
+        });
+      }
+      
       // Remove any existing multi-artist UI
       const expandBtn = artistElement.querySelector('.artist-expand-btn');
       const dropdown = artistElement.querySelector('.artist-ratings-dropdown');
@@ -398,14 +495,19 @@ async function fetchCurrentTrack() {
           dropdown.className = 'artist-ratings-dropdown';
         }
         
-        // Update dropdown content
-        dropdown.innerHTML = artistRatingData.map(rating => {
-          const color = getRatingColor(rating.avgRating);
-          return `<div class="artist-rating-item">
-            <span class="artist-rating-name">${rating.artist}</span>
-            <span class="artist-rating-value" style="color: ${color};">${rating.avgRating.toFixed(1)}</span>
-          </div>`;
-        }).join('');
+        // Update dropdown content with flags
+        dropdown.innerHTML = await Promise.all(
+          artistRatingData.map(async (rating) => {
+            const color = getRatingColor(rating.avgRating);
+            const artistFlag = await ipcRenderer.invoke('getArtistFlag', rating.artist);
+            const flagEmoji = artistFlag ? getFlagEmoji(artistFlag) : '';
+            return `<div class="artist-rating-item">
+              ${flagEmoji ? `<span class="artist-flag-small">${flagEmoji}</span>` : ''}
+              <span class="artist-rating-name">${rating.artist}</span>
+              <span class="artist-rating-value" style="color: ${color};">${rating.avgRating.toFixed(1)}</span>
+            </div>`;
+          })
+        ).then(html => html.join(''));
         
         // Update main display
         artistElement.innerHTML = `
@@ -614,7 +716,7 @@ document.querySelectorAll('.rating-button').forEach((button) => {
               artistRatingData.length;
 
             // First, set up the display structure
-            updateMultiArtistDisplay(artistElement, artists, artistRatingData);
+            await updateMultiArtistDisplay(artistElement, artists, artistRatingData);
 
             // Then animate if rating changed
             if (oldRating !== null && oldRating !== newAvgRating) {
@@ -753,6 +855,7 @@ async function loadTrackRatings() {
 async function loadArtistRatings() {
   try {
     const ratings = await ipcRenderer.invoke('getArtistRatings');
+    const allFlags = await ipcRenderer.invoke('getAllArtistFlags');
     const topThree = document.getElementById('artist-top-three');
     const table = document.getElementById('artist-ratings-table');
     const emptyState = document.getElementById('artist-ratings-empty');
@@ -776,13 +879,13 @@ async function loadArtistRatings() {
     const rest = limitedRatings.slice(3);
 
     for (let i = 0; i < top3.length; i++) {
-      const card = await createTopThreeCard(top3[i], i + 1, 'artist');
+      const card = await createTopThreeCard(top3[i], i + 1, 'artist', allFlags);
       topThree.appendChild(card);
     }
 
     // Create table for rest
     if (rest.length > 0) {
-      table.appendChild(createRatingsTable(rest, 4, 'artist'));
+      table.appendChild(createRatingsTable(rest, 4, 'artist', allFlags));
     }
   } catch (error) {
     console.error('Ошибка при загрузке рейтингов исполнителей:', error);
@@ -916,7 +1019,7 @@ async function loadVibeRatings() {
  * @param {string} type - Type (track, artist, genre)
  * @returns {HTMLElement} Top three card element
  */
-async function createTopThreeCard(item, rank, type) {
+async function createTopThreeCard(item, rank, type, allFlags = {}) {
   const card = document.createElement('div');
   card.className = `top-three-card top-three-rank-${rank}`;
 
@@ -1049,12 +1152,17 @@ async function createTopThreeCard(item, rank, type) {
       </div>
     `;
   } else if (type === 'artist') {
+    const artistFlag = allFlags[item.artist];
+    const flagEmoji = artistFlag ? getFlagEmoji(artistFlag) : '';
     content = `
       <div class="top-three-effect ${effect}"></div>
       <div class="top-three-rank">${emoji}</div>
       <div class="top-three-content">
         <div class="top-three-position">#${rank}</div>
-        <h3 class="top-three-title">${item.artist}</h3>
+        <h3 class="top-three-title">
+          ${flagEmoji ? `<span class="artist-flag">${flagEmoji}</span>` : ''}
+          ${item.artist}
+        </h3>
         <p class="top-three-subtitle">${item.count} ${
       item.count === 1 ? 'трек' : item.count < 5 ? 'трека' : 'треков'
     }</p>
@@ -1120,7 +1228,7 @@ async function createTopThreeCard(item, rank, type) {
  * @param {string} type - Type (track, artist, genre)
  * @returns {HTMLElement} Table element
  */
-function createRatingsTable(items, startRank, type) {
+function createRatingsTable(items, startRank, type, allFlags = {}) {
   const table = document.createElement('table');
   table.className = 'ratings-table';
 
@@ -1238,9 +1346,14 @@ function createRatingsTable(items, startRank, type) {
         <td class="count-col">${item.count}</td>
       `;
     } else if (type === 'artist') {
+      const artistFlag = allFlags[item.artist];
+      const flagEmoji = artistFlag ? getFlagEmoji(artistFlag) : '';
       row.innerHTML = `
         <td class="rank-col">${rank}</td>
-        <td class="artist-col">${item.artist}</td>
+        <td class="artist-col">
+          ${flagEmoji ? `<span class="artist-flag-small">${flagEmoji}</span>` : ''}
+          ${item.artist}
+        </td>
         <td class="rating-col" style="color: ${getRatingColor(item.avgRating)}">
           ${item.avgRating.toFixed(1)}
         </td>
@@ -1598,6 +1711,78 @@ document.getElementById('vibe-expand-btn').addEventListener('click', () => {
   vibesExpanded = !vibesExpanded;
   loadVibeButtons(null, vibesExpanded);
 });
+
+// Flag selector modal
+function showFlagSelector(artistName, artistElement) {
+  // Remove existing modal if any
+  const existingModal = document.getElementById('flag-selector-modal');
+  if (existingModal) {
+    existingModal.remove();
+  }
+
+  // Get current flag
+  ipcRenderer.invoke('getArtistFlag', artistName).then(currentFlag => {
+    const modal = document.createElement('div');
+    modal.id = 'flag-selector-modal';
+    modal.className = 'flag-selector-modal';
+    
+    modal.innerHTML = `
+      <div class="flag-selector-overlay"></div>
+      <div class="flag-selector-content">
+        <div class="flag-selector-header">
+          <h3>Выберите флаг для "${artistName}"</h3>
+          <button class="flag-selector-close" title="Закрыть">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="18" y1="6" x2="6" y2="18"></line>
+              <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+          </button>
+        </div>
+        <div class="flag-selector-grid">
+          <button class="flag-option ${!currentFlag ? 'selected' : ''}" data-code="">
+            <span class="flag-emoji">🚫</span>
+            <span class="flag-label">Удалить</span>
+          </button>
+          ${COMMON_COUNTRIES.map(country => `
+            <button class="flag-option ${currentFlag === country.code ? 'selected' : ''}" data-code="${country.code}">
+              <span class="flag-emoji">${getFlagEmoji(country.code)}</span>
+              <span class="flag-label">${country.name}</span>
+            </button>
+          `).join('')}
+        </div>
+      </div>
+    `;
+    
+    document.body.appendChild(modal);
+    
+    // Close handlers
+    const closeBtn = modal.querySelector('.flag-selector-close');
+    const overlay = modal.querySelector('.flag-selector-overlay');
+    const closeModal = () => modal.remove();
+    
+    closeBtn.addEventListener('click', closeModal);
+    overlay.addEventListener('click', closeModal);
+    
+    // Flag selection handlers
+    modal.querySelectorAll('.flag-option').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const flagCode = btn.getAttribute('data-code') || null;
+        const result = await ipcRenderer.invoke('saveArtistFlag', {
+          artistName,
+          flagCode: flagCode || undefined
+        });
+        
+        if (result.success) {
+          closeModal();
+          // Refresh the artist display
+          setTimeout(() => {
+            fetchCurrentTrack();
+          }, 100);
+        }
+      });
+    });
+  });
+}
 
 // Инициализация
 document.addEventListener('DOMContentLoaded', async () => {

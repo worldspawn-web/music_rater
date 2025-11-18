@@ -24,6 +24,7 @@ const CONSTANTS = {
     COVERS: 'covers',
     RATINGS: 'ratings.json',
     VIBES: 'vibes.json',
+    ARTIST_FLAGS: 'artist-flags.json',
   },
   RATING: {
     COOLDOWN_MS: 5 * 60 * 1000, // 5 minutes
@@ -1293,6 +1294,44 @@ function registerIpcHandlers() {
     } catch (error) {
       console.error('IPC Error - saveVibe:', error);
       return { success: false, message: 'Ошибка при сохранении настроения' };
+    }
+  });
+
+  // Get artist flag
+  ipcMain.handle('getArtistFlag', async (event, artistName) => {
+    try {
+      const flags = await readJsonFile(CONSTANTS.PATHS.ARTIST_FLAGS, {});
+      return flags[artistName] || null;
+    } catch (error) {
+      console.error('IPC Error - getArtistFlag:', error);
+      return null;
+    }
+  });
+
+  // Save artist flag
+  ipcMain.handle('saveArtistFlag', async (event, { artistName, flagCode }) => {
+    try {
+      const flags = await readJsonFile(CONSTANTS.PATHS.ARTIST_FLAGS, {});
+      if (flagCode) {
+        flags[artistName] = flagCode;
+      } else {
+        delete flags[artistName];
+      }
+      await writeJsonFile(CONSTANTS.PATHS.ARTIST_FLAGS, flags);
+      return { success: true };
+    } catch (error) {
+      console.error('IPC Error - saveArtistFlag:', error);
+      return { success: false, message: 'Ошибка при сохранении флага' };
+    }
+  });
+
+  // Get all artist flags
+  ipcMain.handle('getAllArtistFlags', async () => {
+    try {
+      return await readJsonFile(CONSTANTS.PATHS.ARTIST_FLAGS, {});
+    } catch (error) {
+      console.error('IPC Error - getAllArtistFlags:', error);
+      return {};
     }
   });
 }
