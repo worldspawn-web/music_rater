@@ -1,4 +1,8 @@
 const { ipcRenderer } = require('electron');
+// Make ipcRenderer available globally for flag-utils.js
+if (typeof window !== 'undefined') {
+  window.ipcRenderer = ipcRenderer;
+}
 
 // Переключение вкладок
 document.querySelectorAll('.nav-tab').forEach((button) => {
@@ -161,72 +165,28 @@ function normalizeTrackField(value) {
  * @param {string} artistString - Artist string that may contain multiple artists
  * @returns {Array<string>} Array of individual artist names
  */
-// Country code to flag emoji mapping
-function getFlagEmoji(countryCode) {
-  if (!countryCode) return '';
-  // Convert country code (e.g., 'US', 'RU') to flag emoji
-  const codePoints = countryCode
-    .toUpperCase()
-    .split('')
-    .map(char => 127397 + char.charCodeAt(0));
-  return String.fromCodePoint(...codePoints);
-}
+// Flag utilities are imported from flag-utils.js (loaded via script tag)
+// Access them via window.FlagUtils to avoid conflicts
+const FlagUtils = window.FlagUtils || {
+  getFlagEmoji: (code) => {
+    if (!code) return '';
+    const codePoints = code.toUpperCase().split('').map(char => 127397 + char.charCodeAt(0));
+    return String.fromCodePoint(...codePoints);
+  },
+  getCountryName: (code) => code || '',
+  searchCountries: () => [],
+  getUsedFlagCountries: async () => [],
+  ALL_COUNTRIES: [],
+  CUSTOM_FLAGS: {}
+};
 
-// Common countries for flag selector
-const COMMON_COUNTRIES = [
-  { code: 'US', name: 'United States' },
-  { code: 'GB', name: 'United Kingdom' },
-  { code: 'RU', name: 'Russia' },
-  { code: 'DE', name: 'Germany' },
-  { code: 'FR', name: 'France' },
-  { code: 'IT', name: 'Italy' },
-  { code: 'ES', name: 'Spain' },
-  { code: 'JP', name: 'Japan' },
-  { code: 'KR', name: 'South Korea' },
-  { code: 'CN', name: 'China' },
-  { code: 'CA', name: 'Canada' },
-  { code: 'AU', name: 'Australia' },
-  { code: 'BR', name: 'Brazil' },
-  { code: 'MX', name: 'Mexico' },
-  { code: 'AR', name: 'Argentina' },
-  { code: 'SE', name: 'Sweden' },
-  { code: 'NO', name: 'Norway' },
-  { code: 'DK', name: 'Denmark' },
-  { code: 'FI', name: 'Finland' },
-  { code: 'NL', name: 'Netherlands' },
-  { code: 'BE', name: 'Belgium' },
-  { code: 'PL', name: 'Poland' },
-  { code: 'UA', name: 'Ukraine' },
-  { code: 'TR', name: 'Turkey' },
-  { code: 'IN', name: 'India' },
-  { code: 'ID', name: 'Indonesia' },
-  { code: 'PH', name: 'Philippines' },
-  { code: 'TH', name: 'Thailand' },
-  { code: 'VN', name: 'Vietnam' },
-  { code: 'NZ', name: 'New Zealand' },
-  { code: 'IE', name: 'Ireland' },
-  { code: 'PT', name: 'Portugal' },
-  { code: 'GR', name: 'Greece' },
-  { code: 'CH', name: 'Switzerland' },
-  { code: 'AT', name: 'Austria' },
-  { code: 'CZ', name: 'Czech Republic' },
-  { code: 'HU', name: 'Hungary' },
-  { code: 'RO', name: 'Romania' },
-  { code: 'BG', name: 'Bulgaria' },
-  { code: 'HR', name: 'Croatia' },
-  { code: 'RS', name: 'Serbia' },
-  { code: 'SI', name: 'Slovenia' },
-  { code: 'SK', name: 'Slovakia' },
-  { code: 'EE', name: 'Estonia' },
-  { code: 'LV', name: 'Latvia' },
-  { code: 'LT', name: 'Lithuania' },
-  { code: 'IS', name: 'Iceland' },
-  { code: 'ZA', name: 'South Africa' },
-  { code: 'EG', name: 'Egypt' },
-  { code: 'IL', name: 'Israel' },
-  { code: 'AE', name: 'UAE' },
-  { code: 'SA', name: 'Saudi Arabia' },
-];
+// Create local references to avoid typing FlagUtils. everywhere
+const getFlagEmoji = FlagUtils.getFlagEmoji.bind(FlagUtils);
+const getCountryName = FlagUtils.getCountryName.bind(FlagUtils);
+const searchCountries = FlagUtils.searchCountries.bind(FlagUtils);
+const getUsedFlagCountries = FlagUtils.getUsedFlagCountries.bind(FlagUtils);
+const ALL_COUNTRIES = FlagUtils.ALL_COUNTRIES || [];
+const CUSTOM_FLAGS = FlagUtils.CUSTOM_FLAGS || {};
 
 function parseArtists(artistString) {
   if (!artistString || typeof artistString !== 'string') {
@@ -1750,78 +1710,211 @@ document.getElementById('vibe-expand-btn').addEventListener('click', () => {
 });
 
 // Flag selector modal
-function showFlagSelector(artistName, artistElement) {
+async function showFlagSelector(artistName, artistElement) {
   // Remove existing modal if any
   const existingModal = document.getElementById('flag-selector-modal');
   if (existingModal) {
     existingModal.remove();
   }
 
-  // Get current flag
-  ipcRenderer.invoke('getArtistFlag', artistName).then(currentFlag => {
-    const modal = document.createElement('div');
-    modal.id = 'flag-selector-modal';
-    modal.className = 'flag-selector-modal';
-    
-    modal.innerHTML = `
-      <div class="flag-selector-overlay"></div>
-      <div class="flag-selector-content">
-        <div class="flag-selector-header">
-          <h3>Выберите флаг для "${artistName}"</h3>
-          <button class="flag-selector-close" title="Закрыть">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <line x1="18" y1="6" x2="6" y2="18"></line>
-              <line x1="6" y1="6" x2="18" y2="18"></line>
-            </svg>
-          </button>
-        </div>
-        <div class="flag-selector-grid">
-          <button class="flag-option ${!currentFlag ? 'selected' : ''}" data-code="">
-            <span class="flag-emoji">🚫</span>
-            <span class="flag-label">Удалить</span>
-          </button>
-          ${COMMON_COUNTRIES.map(country => `
-            <button class="flag-option ${currentFlag === country.code ? 'selected' : ''}" data-code="${country.code}">
-              <span class="flag-emoji">${getFlagEmoji(country.code)}</span>
-              <span class="flag-label">${country.name}</span>
-            </button>
-          `).join('')}
-        </div>
+  // Get current flag and used flags
+  const [currentFlag, usedCountries] = await Promise.all([
+    ipcRenderer.invoke('getArtistFlag', artistName),
+    getUsedFlagCountries()
+  ]);
+
+  const modal = document.createElement('div');
+  modal.id = 'flag-selector-modal';
+  modal.className = 'flag-selector-modal';
+  
+  modal.innerHTML = `
+    <div class="flag-selector-overlay"></div>
+    <div class="flag-selector-content">
+      <div class="flag-selector-header">
+        <h3>Выберите флаг для "${artistName}"</h3>
+        <button class="flag-selector-close" title="Закрыть">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+          </svg>
+        </button>
       </div>
-    `;
-    
-    document.body.appendChild(modal);
-    
-    // Close handlers
-    const closeBtn = modal.querySelector('.flag-selector-close');
-    const overlay = modal.querySelector('.flag-selector-overlay');
-    const closeModal = () => modal.remove();
-    
-    closeBtn.addEventListener('click', closeModal);
-    overlay.addEventListener('click', closeModal);
-    
-    // Flag selection handlers
-    modal.querySelectorAll('.flag-option').forEach(btn => {
-      btn.addEventListener('click', async () => {
-        const flagCode = btn.getAttribute('data-code') || null;
-        const result = await ipcRenderer.invoke('saveArtistFlag', {
-          artistName,
-          flagCode: flagCode || undefined
-        });
-        
-        if (result.success) {
-          closeModal();
-          // Refresh the artist display
-          setTimeout(() => {
-            fetchCurrentTrack();
-            // Also refresh Artists tab if it's currently active
-            const artistsTab = document.querySelector('.nav-tab[data-tab="artist-ratings"]');
-            if (artistsTab && artistsTab.classList.contains('active')) {
-              loadArtistRatings();
-            }
-          }, 100);
-        }
+      <div class="flag-selector-grid">
+        <button class="flag-option ${!currentFlag ? 'selected' : ''}" data-code="">
+          <span class="flag-emoji">🚫</span>
+          <span class="flag-label">Удалить</span>
+        </button>
+        ${usedCountries.map(country => `
+          <button class="flag-option ${currentFlag === country.code ? 'selected' : ''}" data-code="${country.code}">
+            <span class="flag-emoji">${getFlagEmoji(country.code)}</span>
+            <span class="flag-label">${country.name}</span>
+          </button>
+        `).join('')}
+        <button class="flag-option flag-option-other" id="flag-other-btn">
+          <span class="flag-emoji">➕</span>
+          <span class="flag-label">Другое</span>
+        </button>
+      </div>
+    </div>
+  `;
+  
+  document.body.appendChild(modal);
+  
+  // Close handlers
+  const closeBtn = modal.querySelector('.flag-selector-close');
+  const overlay = modal.querySelector('.flag-selector-overlay');
+  const closeModal = () => modal.remove();
+  
+  closeBtn.addEventListener('click', closeModal);
+  overlay.addEventListener('click', closeModal);
+  
+  // Flag selection handlers
+  modal.querySelectorAll('.flag-option:not(.flag-option-other)').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const flagCode = btn.getAttribute('data-code') || null;
+      const result = await ipcRenderer.invoke('saveArtistFlag', {
+        artistName,
+        flagCode: flagCode || undefined
       });
+      
+      if (result.success) {
+        closeModal();
+        // Refresh the artist display
+        setTimeout(() => {
+          fetchCurrentTrack();
+          // Also refresh Artists tab if it's currently active
+          const artistsTab = document.querySelector('.nav-tab[data-tab="artist-ratings"]');
+          if (artistsTab && artistsTab.classList.contains('active')) {
+            loadArtistRatings();
+          }
+        }, 100);
+      }
+    });
+  });
+
+  // "Other" button handler - opens search modal
+  const otherBtn = modal.querySelector('#flag-other-btn');
+  otherBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    closeModal();
+    showFlagSearchModal(artistName);
+  });
+}
+
+// Flag search modal for selecting new flags
+function showFlagSearchModal(artistName) {
+  // Remove existing modal if any
+  const existingModal = document.getElementById('flag-search-modal');
+  if (existingModal) {
+    existingModal.remove();
+  }
+
+  const modal = document.createElement('div');
+  modal.id = 'flag-search-modal';
+  modal.className = 'flag-selector-modal';
+  
+  modal.innerHTML = `
+    <div class="flag-selector-overlay"></div>
+    <div class="flag-selector-content flag-search-content">
+      <div class="flag-selector-header">
+        <h3>Поиск флага для "${artistName}"</h3>
+        <button class="flag-selector-close" title="Закрыть">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+          </svg>
+        </button>
+      </div>
+      <div class="flag-search-input-wrapper">
+        <input type="text" id="flag-search-input" class="flag-search-input" placeholder="Введите название страны..." autofocus>
+      </div>
+      <div class="flag-selector-grid" id="flag-search-results">
+        ${ALL_COUNTRIES.map(country => `
+          <button class="flag-option" data-code="${country.code}">
+            <span class="flag-emoji">${getFlagEmoji(country.code)}</span>
+            <span class="flag-label">${country.name}</span>
+          </button>
+        `).join('')}
+        ${Object.keys(CUSTOM_FLAGS).map(code => `
+          <button class="flag-option" data-code="${code}">
+            <span class="flag-emoji">${getFlagEmoji(code)}</span>
+            <span class="flag-label">${getCountryName(code)}</span>
+          </button>
+        `).join('')}
+      </div>
+    </div>
+  `;
+  
+  document.body.appendChild(modal);
+  
+  // Close handlers
+  const closeBtn = modal.querySelector('.flag-selector-close');
+  const overlay = modal.querySelector('.flag-selector-overlay');
+  const closeModal = () => modal.remove();
+  
+  closeBtn.addEventListener('click', closeModal);
+  overlay.addEventListener('click', closeModal);
+  
+  // Search functionality
+  const searchInput = modal.querySelector('#flag-search-input');
+  const resultsGrid = modal.querySelector('#flag-search-results');
+  
+  searchInput.addEventListener('input', (e) => {
+    const query = e.target.value;
+    const results = searchCountries(query);
+    const customResults = Object.keys(CUSTOM_FLAGS).filter(code => 
+      getCountryName(code).toLowerCase().includes(query.toLowerCase())
+    );
+    
+    resultsGrid.innerHTML = [
+      ...results.map(country => `
+        <button class="flag-option" data-code="${country.code}">
+          <span class="flag-emoji">${getFlagEmoji(country.code)}</span>
+          <span class="flag-label">${country.name}</span>
+        </button>
+      `),
+      ...customResults.map(code => `
+        <button class="flag-option" data-code="${code}">
+          <span class="flag-emoji">${getFlagEmoji(code)}</span>
+          <span class="flag-label">${getCountryName(code)}</span>
+        </button>
+      `)
+    ].join('');
+    
+    // Re-attach click handlers
+    attachFlagSelectionHandlers(modal, artistName, closeModal);
+  });
+  
+  // Initial handlers
+  attachFlagSelectionHandlers(modal, artistName, closeModal);
+}
+
+// Helper function to attach flag selection handlers
+function attachFlagSelectionHandlers(modal, artistName, closeModal) {
+  modal.querySelectorAll('.flag-option').forEach(btn => {
+    // Remove existing listeners by cloning
+    const newBtn = btn.cloneNode(true);
+    btn.parentNode.replaceChild(newBtn, btn);
+    
+    newBtn.addEventListener('click', async () => {
+      const flagCode = newBtn.getAttribute('data-code');
+      const result = await ipcRenderer.invoke('saveArtistFlag', {
+        artistName,
+        flagCode: flagCode || undefined
+      });
+      
+      if (result.success) {
+        closeModal();
+        // Refresh the artist display
+        setTimeout(() => {
+          fetchCurrentTrack();
+          // Also refresh Artists tab if it's currently active
+          const artistsTab = document.querySelector('.nav-tab[data-tab="artist-ratings"]');
+          if (artistsTab && artistsTab.classList.contains('active')) {
+            loadArtistRatings();
+          }
+        }, 100);
+      }
     });
   });
 }
