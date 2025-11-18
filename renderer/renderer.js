@@ -1154,13 +1154,20 @@ async function createTopThreeCard(item, rank, type, allFlags = {}) {
   } else if (type === 'artist') {
     const artistFlag = allFlags[item.artist];
     const flagEmoji = artistFlag ? getFlagEmoji(artistFlag) : '';
+    const flagButton = flagEmoji 
+      ? `<button class="artist-flag-clickable" data-artist="${item.artist}" title="Изменить флаг">${flagEmoji}</button>`
+      : `<button class="artist-flag-btn" data-artist="${item.artist}" title="Добавить флаг исполнителя">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+          </svg>
+        </button>`;
     content = `
       <div class="top-three-effect ${effect}"></div>
       <div class="top-three-rank">${emoji}</div>
       <div class="top-three-content">
         <div class="top-three-position">#${rank}</div>
         <h3 class="top-three-title">
-          ${flagEmoji ? `<span class="artist-flag">${flagEmoji}</span>` : ''}
+          ${flagButton}
           ${item.artist}
         </h3>
         <p class="top-three-subtitle">${item.count} ${
@@ -1217,6 +1224,18 @@ async function createTopThreeCard(item, rank, type, allFlags = {}) {
 
   card.innerHTML = content;
   card.style.setProperty('--rank-color', color);
+
+  // Add flag button click handlers for artists
+  if (type === 'artist') {
+    const flagBtn = card.querySelector('.artist-flag-btn, .artist-flag-clickable');
+    if (flagBtn) {
+      flagBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const artistName = flagBtn.getAttribute('data-artist');
+        showFlagSelector(artistName, flagBtn);
+      });
+    }
+  }
 
   return card;
 }
@@ -1348,10 +1367,17 @@ function createRatingsTable(items, startRank, type, allFlags = {}) {
     } else if (type === 'artist') {
       const artistFlag = allFlags[item.artist];
       const flagEmoji = artistFlag ? getFlagEmoji(artistFlag) : '';
+      const flagButton = flagEmoji 
+        ? `<button class="artist-flag-clickable-small" data-artist="${item.artist}" title="Изменить флаг">${flagEmoji}</button>`
+        : `<button class="artist-flag-btn-small" data-artist="${item.artist}" title="Добавить флаг исполнителя">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+            </svg>
+          </button>`;
       row.innerHTML = `
         <td class="rank-col">${rank}</td>
         <td class="artist-col">
-          ${flagEmoji ? `<span class="artist-flag-small">${flagEmoji}</span>` : ''}
+          ${flagButton}
           ${item.artist}
         </td>
         <td class="rating-col" style="color: ${getRatingColor(item.avgRating)}">
@@ -1451,6 +1477,17 @@ function createRatingsTable(items, startRank, type, allFlags = {}) {
 
   table.innerHTML = headerHTML;
   table.appendChild(tbody);
+
+  // Add flag button click handlers for artists in table
+  if (type === 'artist') {
+    tbody.querySelectorAll('.artist-flag-btn-small, .artist-flag-clickable-small').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const artistName = btn.getAttribute('data-artist');
+        showFlagSelector(artistName, btn);
+      });
+    });
+  }
 
   return table;
 }
@@ -1777,6 +1814,11 @@ function showFlagSelector(artistName, artistElement) {
           // Refresh the artist display
           setTimeout(() => {
             fetchCurrentTrack();
+            // Also refresh Artists tab if it's currently active
+            const artistsTab = document.querySelector('.nav-tab[data-tab="artist-ratings"]');
+            if (artistsTab && artistsTab.classList.contains('active')) {
+              loadArtistRatings();
+            }
           }, 100);
         }
       });
