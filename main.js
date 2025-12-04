@@ -283,9 +283,10 @@ class NowPlayingService {
         return {
           title: windowsTrack.title,
           artist: windowsTrack.artist,
-          album: windowsTrack.album || 'Unknown Album',
+          album: windowsTrack.album || '',  // Leave empty if not provided, will be looked up
           isPlaying: windowsTrack.isPlaying,
           sourceApp: windowsTrack.sourceApp,
+          thumbnail: windowsTrack.thumbnail || null,  // Pass Windows thumbnail
         };
       }
       
@@ -294,7 +295,7 @@ class NowPlayingService {
         return {
           title: manualTrackInfo.title,
           artist: manualTrackInfo.artist,
-          album: manualTrackInfo.album || 'Unknown Album',
+          album: manualTrackInfo.album || '',
         };
       }
       
@@ -320,33 +321,125 @@ class NowPlayingService {
   }
 
   /**
-   * Fetches high-resolution artwork from Last.fm API
+   * Looks up track info from Last.fm to find the album name
    * @param {string} artist - Artist name
-   * @param {string} album - Album name
-   * @returns {Promise<string|null>} Base64 artwork data or null
+   * @param {string} track - Track title
+   * @returns {Promise<{album: string, albumArtist: string}|null>} Album info or null
    */
-  static async fetchHighResArtwork(artist, album) {
-    if (!artist || !album) {
-      console.log(
-        `Skipping Last.fm lookup: artist="${artist}", album="${album}"`
-      );
+  static async lookupTrackInfo(artist, track) {
+    const apiKey = process.env.LASTFM_API_KEY;
+    if (!apiKey || !artist || !track) {
       return null;
     }
 
     try {
-      // Last.fm API endpoint for album info
-      const apiKey = process.env.LASTFM_API_KEY;
-      if (!apiKey) {
-        console.log(
-          '⚠️ LASTFM_API_KEY not found in .env file, skipping Last.fm lookup'
-        );
+      // For tracks with multiple artists, try with the first artist
+      const primaryArtist = artist.split(/[,&]|feat\.|ft\./i)[0].trim();
+      const encodedArtist = encodeURIComponent(primaryArtist);
+      const encodedTrack = encodeURIComponent(track);
+      const url = `https://ws.audioscrobbler.com/2.0/?method=track.getInfo&api_key=${apiKey}&artist=${encodedArtist}&track=${encodedTrack}&format=json`;
+
+      return new Promise((resolve) => {
+        const req = https.get(url, (res) => {
+          let data = '';
+          res.on('data', (chunk) => { data += chunk; });
+          res.on('end', () => {
+            try {
+              if (res.statusCode !== 200) {
+                resolve(null);
+                return;
+              }
+              const json = JSON.parse(data);
+              if (json.error || !json.track) {
+                resolve(null);
+                return;
+              }
+              const albumInfo = json.track.album;
+              if (albumInfo && albumInfo.title) {
+                console.log(`📀 Found album from Last.fm: "${albumInfo.title}"`);
+                resolve({
+                  album: albumInfo.title,
+                  albumArtist: albumInfo.artist || primaryArtist,
+                  image: albumInfo.image // Array of images
+                });
+              } else {
+                resolve(null);
+              }
+            } catch {
+              resolve(null);
+            }
+          });
+        });
+        req.on('error', () => resolve(null));
+        req.setTimeout(5000, () => { req.destroy(); resolve(null); });
+      });
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Fetches high-resolution artwork from Last.fm API
+   * @param {string} artist - Artist name
+   * @param {string} album - Album name
+   * @param {string} track - Track title (optional, used to look up album if not provided)
+   * @returns {Promise<string|null>} Base64 artwork data or null
+   */
+  static async fetchHighResArtwork(artist, album, track = null) {
+    const apiKey = process.env.LASTFM_API_KEY;
+    if (!apiKey) {
+      console.log(
+        '⚠️ LASTFM_API_KEY not found in .env file, skipping Last.fm lookup'
+      );
+      return null;
+    }
+
+    if (!artist) {
+      console.log('Skipping Last.fm lookup: no artist provided');
+      return null;
+    }
+
+    // If album is missing or is "Unknown Album", try to look it up from track info
+    let albumToUse = album;
+    if (!album || album === 'Unknown Album' || album === '') {
+      if (track) {
+        console.log(`🔍 Looking up album for track: "${track}" by ${artist}`);
+        const trackInfo = await this.lookupTrackInfo(artist, track);
+        if (trackInfo && trackInfo.album) {
+          albumToUse = trackInfo.album;
+          
+          // If we got images directly from track.getInfo, try to use them
+          if (trackInfo.image && trackInfo.image.length > 0) {
+            for (const size of ['extralarge', 'large', 'medium']) {
+              const img = trackInfo.image.find((i) => i.size === size);
+              if (img && img['#text'] && img['#text'].trim() !== '' && 
+                  !img['#text'].includes('2a96cbd8b46e442fc41c2b86b821562f')) {
+                console.log(`Found ${size} image from track info`);
+                const imageData = await this.downloadImage(img['#text'].trim());
+                if (imageData) {
+                  return imageData;
+                }
+              }
+            }
+          }
+        } else {
+          console.log('Could not find album info from Last.fm');
+          return null;
+        }
+      } else {
+        console.log('Skipping Last.fm lookup: no album or track info');
         return null;
       }
-      const encodedArtist = encodeURIComponent(artist);
-      const encodedAlbum = encodeURIComponent(album);
+    }
+
+    try {
+      // For artists with multiple names, use the first one for API lookup
+      const primaryArtist = artist.split(/[,&]|feat\.|ft\./i)[0].trim();
+      const encodedArtist = encodeURIComponent(primaryArtist);
+      const encodedAlbum = encodeURIComponent(albumToUse);
       const url = `https://ws.audioscrobbler.com/2.0/?method=album.getinfo&api_key=${apiKey}&artist=${encodedArtist}&album=${encodedAlbum}&format=json`;
 
-      console.log(`🔍 Fetching artwork from Last.fm for: ${artist} - ${album}`);
+      console.log(`🔍 Fetching artwork from Last.fm for: ${primaryArtist} - ${albumToUse}`);
 
       return new Promise((resolve) => {
         const req = https.get(url, (res) => {
@@ -531,26 +624,45 @@ class NowPlayingService {
    * Checks for existing high-res cover first, then tries Last.fm, falls back to artworkData
    * @param {string} artist - Artist name (optional, for Last.fm lookup)
    * @param {string} album - Album name (optional, for Last.fm lookup)
-   * @returns {Promise<{data: string|null, isHighRes: boolean}>} Artwork data and quality flag
+   * @param {string} track - Track title (optional, for Last.fm lookup when album is missing)
+   * @param {string} windowsThumbnail - Thumbnail from Windows SMTC (optional)
+   * @returns {Promise<{data: string|null, isHighRes: boolean, albumName: string|null}>} Artwork data and quality flag
    */
-  static async getArtworkData(artist = null, album = null) {
+  static async getArtworkData(artist = null, album = null, track = null, windowsThumbnail = null) {
     try {
+      let resolvedAlbum = album;
+      
       // First check if a high-resolution cover already exists
-      if (album && (await this.hasHighResCover(album))) {
+      if (album && album !== 'Unknown Album' && album !== '' && (await this.hasHighResCover(album))) {
         console.log(
           '✅ High-resolution cover already exists, skipping API request'
         );
         // Return null data - the cover path will be handled by saveCover
-        return { data: null, isHighRes: true };
+        return { data: null, isHighRes: true, albumName: album };
       }
 
       // If no high-res cover exists, try to fetch from Last.fm
-      if (artist && album) {
-        const highResArtwork = await this.fetchHighResArtwork(artist, album);
+      if (artist) {
+        const highResArtwork = await this.fetchHighResArtwork(artist, album, track);
         if (highResArtwork) {
           console.log('✅ Fetched high-resolution artwork from Last.fm');
-          return { data: highResArtwork, isHighRes: true };
+          
+          // If we looked up the album, try to get the resolved album name
+          if ((!album || album === 'Unknown Album' || album === '') && track) {
+            const trackInfo = await this.lookupTrackInfo(artist, track);
+            if (trackInfo && trackInfo.album) {
+              resolvedAlbum = trackInfo.album;
+            }
+          }
+          
+          return { data: highResArtwork, isHighRes: true, albumName: resolvedAlbum };
         }
+      }
+
+      // Try to use Windows thumbnail if available
+      if (windowsThumbnail) {
+        console.log('🖼️ Using thumbnail from Windows media session');
+        return { data: windowsThumbnail, isHighRes: false, albumName: resolvedAlbum };
       }
 
       // On macOS, try to get artwork from nowplaying-cli as fallback
@@ -562,7 +674,7 @@ class NowPlayingService {
             console.log(
               '⚠️ Using low-resolution artwork from nowplaying-cli (150x150)'
             );
-            return { data: artworkData, isHighRes: false };
+            return { data: artworkData, isHighRes: false, albumName: resolvedAlbum };
           }
         } catch (error) {
           console.warn('Error getting artwork from nowplaying-cli:', error.message);
@@ -570,10 +682,10 @@ class NowPlayingService {
       }
 
       // No artwork available
-      return { data: null, isHighRes: false };
+      return { data: null, isHighRes: false, albumName: resolvedAlbum };
     } catch (error) {
       console.warn('Error getting artwork:', error.message);
-      return { data: null, isHighRes: false };
+      return { data: null, isHighRes: false, albumName: album };
     }
   }
 }
@@ -1341,10 +1453,14 @@ function registerIpcHandlers() {
 
       console.log(`🎵 Track changed: ${trackInfo.title} - ${trackInfo.artist}`);
 
+      // Get artwork - pass track title for album lookup, and Windows thumbnail as fallback
       const artworkResult = await NowPlayingService.getArtworkData(
         trackInfo.artist,
-        trackInfo.album
+        trackInfo.album,
+        trackInfo.title,  // Pass track title for album lookup
+        trackInfo.thumbnail  // Pass Windows thumbnail as fallback
       );
+      
       if (artworkResult.data) {
         console.log(
           `Artwork data received: ${(artworkResult.data.length / 1024).toFixed(
@@ -1353,16 +1469,19 @@ function registerIpcHandlers() {
         );
       }
 
+      // Use the resolved album name if available (from Last.fm lookup)
+      const albumName = artworkResult.albumName || trackInfo.album;
+
       // If we have high-res cover but no data (already exists), get the path directly
       let coverPath;
       if (artworkResult.isHighRes && !artworkResult.data) {
         // High-res cover exists, get the path without saving
-        const filename = `${sanitizeFilename(trackInfo.album)}.png`;
+        const filename = `${sanitizeFilename(albumName)}.png`;
         coverPath = `${CONSTANTS.PATHS.COVERS}/${filename}`;
       } else {
         // Save the cover (or skip if already exists)
         coverPath = await CoverService.saveCover(
-          trackInfo.album,
+          albumName,
           artworkResult.data,
           artworkResult.isHighRes
         );
@@ -1370,6 +1489,7 @@ function registerIpcHandlers() {
 
       const result = {
         ...trackInfo,
+        album: albumName,  // Use resolved album name
         coverPath,
       };
 
