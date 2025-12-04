@@ -189,9 +189,9 @@ async function getWindowsNowPlaying() {
     const output = await new Promise((resolve, reject) => {
       const { spawn } = require('child_process');
       const proc = spawn(python, [scriptPath], {
-        encoding: 'utf8',
         shell: true,
         windowsHide: true,
+        env: { ...process.env, PYTHONIOENCODING: 'utf-8' },  // Force Python UTF-8
       });
       
       let stdout = '';
