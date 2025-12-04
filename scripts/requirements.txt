@@ -1,0 +1,9 @@
+# Python requirements for Windows media detection
+# Install with: pip install -r scripts/requirements.txt
+
+# WinRT bindings for Windows.Media.Control
+winrt-runtime>=3.2.0
+winrt-Windows.Media.Control>=3.2.0
+winrt-Windows.Foundation>=3.2.0
+winrt-Windows.Foundation.Collections>=3.2.0
+
