@@ -321,6 +321,63 @@ class NowPlayingService {
   }
 
   /**
+   * Checks if an album name looks like a compilation/playlist
+   * @param {string} albumName - Album name to check
+   * @returns {boolean} True if it looks like a compilation
+   */
+  static isCompilationAlbum(albumName) {
+    if (!albumName) return true;
+    
+    const compilationPatterns = [
+      /\b(hits|best of|greatest|collection|compilation|playlist|songs|mix|antholog)/i,
+      /\b(sad|happy|chill|workout|party|summer|winter|love|breakup)\s+(rap|hip.?hop|r&b|pop|rock|songs|music|vibes)/i,
+      /\b(rap|hip.?hop|r&b)\s+(hits|songs|anthems|bangers|classics)/i,
+      /\b(top\s+\d+|now\s+that'?s)/i,
+      /\b(various\s+artists|va\s*[-–—])/i,
+    ];
+    
+    return compilationPatterns.some(pattern => pattern.test(albumName));
+  }
+
+  /**
+   * Normalizes artist name for comparison
+   * @param {string} name - Artist name
+   * @returns {string} Normalized name
+   */
+  static normalizeArtistName(name) {
+    if (!name) return '';
+    return name
+      .toLowerCase()
+      .replace(/[^\w\s]/g, '')  // Remove special chars
+      .replace(/\s+/g, ' ')     // Normalize spaces
+      .trim();
+  }
+
+  /**
+   * Checks if two artist names are similar enough to be the same
+   * @param {string} artist1 - First artist name
+   * @param {string} artist2 - Second artist name
+   * @returns {boolean} True if names match
+   */
+  static artistsMatch(artist1, artist2) {
+    const norm1 = this.normalizeArtistName(artist1);
+    const norm2 = this.normalizeArtistName(artist2);
+    
+    // Exact match
+    if (norm1 === norm2) return true;
+    
+    // One contains the other (for "Offset" vs "Offset (Rapper)")
+    if (norm1.includes(norm2) || norm2.includes(norm1)) return true;
+    
+    // Check first word match (for "The Beatles" vs "Beatles")
+    const words1 = norm1.split(' ').filter(w => w !== 'the');
+    const words2 = norm2.split(' ').filter(w => w !== 'the');
+    if (words1[0] === words2[0] && words1[0].length > 3) return true;
+    
+    return false;
+  }
+
+  /**
    * Looks up track info from Last.fm to find the album name
    * @param {string} artist - Artist name
    * @param {string} track - Track title
@@ -337,7 +394,7 @@ class NowPlayingService {
       const primaryArtist = artist.split(/[,&]|feat\.|ft\./i)[0].trim();
       const encodedArtist = encodeURIComponent(primaryArtist);
       const encodedTrack = encodeURIComponent(track);
-      const url = `https://ws.audioscrobbler.com/2.0/?method=track.getInfo&api_key=${apiKey}&artist=${encodedArtist}&track=${encodedTrack}&format=json`;
+      const url = `https://ws.audioscrobbler.com/2.0/?method=track.getInfo&api_key=${apiKey}&artist=${encodedArtist}&track=${encodedTrack}&autocorrect=1&format=json`;
 
       return new Promise((resolve) => {
         const req = https.get(url, (res) => {
@@ -354,17 +411,37 @@ class NowPlayingService {
                 resolve(null);
                 return;
               }
+              
               const albumInfo = json.track.album;
-              if (albumInfo && albumInfo.title) {
-                console.log(`📀 Found album from Last.fm: "${albumInfo.title}"`);
-                resolve({
-                  album: albumInfo.title,
-                  albumArtist: albumInfo.artist || primaryArtist,
-                  image: albumInfo.image // Array of images
-                });
-              } else {
+              if (!albumInfo || !albumInfo.title) {
                 resolve(null);
+                return;
               }
+
+              const albumTitle = albumInfo.title;
+              const albumArtist = albumInfo.artist || '';
+              
+              // Check if this looks like a compilation album
+              if (this.isCompilationAlbum(albumTitle)) {
+                console.log(`⚠️ Skipping compilation album: "${albumTitle}"`);
+                resolve(null);
+                return;
+              }
+              
+              // Check if album artist matches the track artist
+              // If it doesn't match, it's likely a compilation
+              if (albumArtist && !this.artistsMatch(primaryArtist, albumArtist)) {
+                console.log(`⚠️ Album artist mismatch: "${albumArtist}" vs "${primaryArtist}" - skipping "${albumTitle}"`);
+                resolve(null);
+                return;
+              }
+
+              console.log(`📀 Found album from Last.fm: "${albumTitle}" by ${albumArtist || primaryArtist}`);
+              resolve({
+                album: albumTitle,
+                albumArtist: albumArtist || primaryArtist,
+                image: albumInfo.image // Array of images
+              });
             } catch {
               resolve(null);
             }
