@@ -10,6 +10,13 @@ const https = require('https');
 const http = require('http');
 
 // ============================================================================
+// PLATFORM DETECTION
+// ============================================================================
+
+const IS_MAC = process.platform === 'darwin';
+const IS_WINDOWS = process.platform === 'win32';
+
+// ============================================================================
 // CONSTANTS
 // ============================================================================
 
@@ -50,8 +57,9 @@ let lastTrackCache = null;
  */
 function sanitizeFilename(str) {
   const crypto = require('crypto');
-  const hash = crypto.createHash('md5').update(str).digest('hex');
-  const safe = str
+  const safeStr = str || '';
+  const hash = crypto.createHash('md5').update(safeStr).digest('hex');
+  const safe = safeStr
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
     .replace(/[^a-z0-9]/gi, '_')
@@ -61,18 +69,39 @@ function sanitizeFilename(str) {
 }
 
 /**
+ * Gets the cover filename for a track
+ * Uses album if available, otherwise falls back to artist + title
+ * @param {string} album - Album name
+ * @param {string} artist - Artist name
+ * @param {string} title - Track title
+ * @returns {string} Cover filename (without path)
+ */
+function getCoverFilenameForTrack(album, artist, title) {
+  // If we have a valid album name, use it
+  if (album && album.trim() !== '') {
+    return `${sanitizeFilename(album)}.png`;
+  }
+  // Fallback: use artist + title combination
+  const fallbackKey = `${artist || 'unknown'} - ${title || 'unknown'}`;
+  return `track_${sanitizeFilename(fallbackKey)}.png`;
+}
+
+/**
  * Executes a shell command and returns a promise
  * @param {string} command - Command to execute
+ * @param {Object} options - Optional exec options
  * @returns {Promise<string>} Command output
  */
-function execPromise(command) {
+function execPromise(command, options = {}) {
   return new Promise((resolve, reject) => {
-    exec(command, (error, stdout, stderr) => {
+    exec(command, { encoding: 'utf8', ...options }, (error, stdout, stderr) => {
       if (error) {
-        reject(new Error(`Command failed: ${error.message}`));
+        // Include stderr in error for better debugging
+        const errorMsg = stderr ? `${error.message}\nStderr: ${stderr}` : error.message;
+        reject(new Error(`Command failed: ${errorMsg}`));
         return;
       }
-      if (stderr) {
+      if (stderr && !options.ignoreStderr) {
         console.warn(`Command stderr: ${stderr}`);
       }
       resolve(stdout.trim());
@@ -124,15 +153,183 @@ async function writeJsonFile(filePath, data) {
 // SERVICES
 // ============================================================================
 
+// Store for manual track entry (used as fallback on Windows)
+let manualTrackInfo = null;
+
+// Cache for Python availability check
+let pythonCommand = null;
+let pythonChecked = false;
+
 /**
- * Service for interacting with nowplaying-cli
+ * Checks if Python is available and finds the correct command
+ * @returns {Promise<string|null>} Python command or null
+ */
+async function findPythonCommand() {
+  if (pythonChecked) {
+    return pythonCommand;
+  }
+  
+  const commands = ['python', 'python3', 'py'];
+  
+  for (const cmd of commands) {
+    try {
+      const version = await execPromise(`${cmd} --version`);
+      pythonCommand = cmd;
+      pythonChecked = true;
+      console.log(`✅ Found Python: ${cmd} (${version})`);
+      return pythonCommand;
+    } catch (error) {
+      // Try next command
+      console.debug(`Python check failed for "${cmd}": ${error.message}`);
+    }
+  }
+  
+  pythonChecked = true;
+  console.warn('⚠️ Python not found. Manual track entry will be used on Windows.');
+  return null;
+}
+
+/**
+ * Gets currently playing media on Windows using Python helper
+ * @returns {Promise<Object|null>} Track info or null
+ */
+async function getWindowsNowPlaying() {
+  const python = await findPythonCommand();
+  
+  if (!python) {
+    console.log('⚠️ Python not available for track detection');
+    return null;
+  }
+  
+  try {
+    const scriptPath = path.join(__dirname, 'scripts', 'get_now_playing.py');
+    
+    // Use spawn-like approach for better Windows compatibility
+    const output = await new Promise((resolve, reject) => {
+      const { spawn } = require('child_process');
+      const proc = spawn(python, [scriptPath], {
+        shell: true,
+        windowsHide: true,
+        env: { ...process.env, PYTHONIOENCODING: 'utf-8' },  // Force Python UTF-8
+      });
+      
+      let stdout = '';
+      let stderr = '';
+      
+      proc.stdout.on('data', (data) => {
+        stdout += data.toString();
+      });
+      
+      proc.stderr.on('data', (data) => {
+        stderr += data.toString();
+      });
+      
+      // Timeout after 8 seconds (increased from 5)
+      let timeoutId = setTimeout(() => {
+        proc.kill();
+        reject(new Error('Python script timeout'));
+      }, 8000);
+      
+      proc.on('close', (code) => {
+        clearTimeout(timeoutId);
+        if (code !== 0 && stderr) {
+          reject(new Error(stderr));
+        } else {
+          resolve(stdout.trim());
+        }
+      });
+      
+      proc.on('error', (err) => {
+        clearTimeout(timeoutId);
+        reject(err);
+      });
+    });
+    
+    if (!output || output === 'null') {
+      // This is normal - no media is playing
+      return null;
+    }
+    
+    const data = JSON.parse(output);
+    
+    // Check for errors from the Python script
+    if (data.error) {
+      if (data.error === 'WINRT_NOT_INSTALLED') {
+        console.warn('⚠️ WinRT packages not installed. Run: pip install -r scripts/requirements.txt');
+      } else {
+        console.warn(`⚠️ Python script error: ${data.message}`);
+      }
+      return null;
+    }
+    
+    return data;
+  } catch (error) {
+    // Log meaningful errors
+    if (error.message.includes('timeout')) {
+      console.warn('⚠️ Python script timed out - media detection may be slow');
+    } else if (!error.message.includes('No media') && !error.message.includes('null')) {
+      console.warn('Windows now playing error:', error.message);
+    }
+    return null;
+  }
+}
+
+/**
+ * Service for interacting with nowplaying-cli (macOS) or Python helper (Windows)
  */
 class NowPlayingService {
+  /**
+   * Sets manual track information (fallback for Windows if Python not available)
+   * @param {Object} trackInfo - Track information {title, artist, album}
+   */
+  static setManualTrack(trackInfo) {
+    manualTrackInfo = trackInfo;
+    console.log(`📝 Manual track set: ${trackInfo.title} - ${trackInfo.artist}`);
+  }
+
+  /**
+   * Clears manual track information
+   */
+  static clearManualTrack() {
+    manualTrackInfo = null;
+    console.log('📝 Manual track cleared');
+  }
+
   /**
    * Gets current track information
    * @returns {Promise<Object>} Track information
    */
   static async getCurrentTrack() {
+    // On Windows, try Python helper first, then fall back to manual entry
+    if (IS_WINDOWS) {
+      // Try automatic detection via Python
+      const windowsTrack = await getWindowsNowPlaying();
+      
+      if (windowsTrack && windowsTrack.title && windowsTrack.artist) {
+        return {
+          title: windowsTrack.title,
+          artist: windowsTrack.artist,
+          album: windowsTrack.album || '',  // Leave empty if not provided, will be looked up
+          isPlaying: windowsTrack.isPlaying,
+          sourceApp: windowsTrack.sourceApp,
+          thumbnail: windowsTrack.thumbnail || null,  // Pass Windows thumbnail
+        };
+      }
+      
+      // Fall back to manual track entry if set
+      if (manualTrackInfo) {
+        return {
+          title: manualTrackInfo.title,
+          artist: manualTrackInfo.artist,
+          album: manualTrackInfo.album || '',
+        };
+      }
+      
+      // No track available - renderer will show manual entry UI
+      throw new Error('MANUAL_ENTRY_REQUIRED');
+    }
+
+    // On macOS, use nowplaying-cli
     try {
       const title = await execPromise('nowplaying-cli get title');
       const album = await execPromise('nowplaying-cli get album');
@@ -150,33 +347,202 @@ class NowPlayingService {
   }
 
   /**
-   * Fetches high-resolution artwork from Last.fm API
-   * @param {string} artist - Artist name
-   * @param {string} album - Album name
-   * @returns {Promise<string|null>} Base64 artwork data or null
+   * Checks if an album name looks like a compilation/playlist
+   * @param {string} albumName - Album name to check
+   * @returns {boolean} True if it looks like a compilation
    */
-  static async fetchHighResArtwork(artist, album) {
-    if (!artist || !album) {
-      console.log(
-        `Skipping Last.fm lookup: artist="${artist}", album="${album}"`
-      );
+  static isCompilationAlbum(albumName) {
+    if (!albumName) return true;
+    
+    const compilationPatterns = [
+      /\b(hits|best of|greatest|collection|compilation|playlist|songs|mix|antholog)/i,
+      /\b(sad|happy|chill|workout|party|summer|winter|love|breakup)\s+(rap|hip.?hop|r&b|pop|rock|songs|music|vibes)/i,
+      /\b(rap|hip.?hop|r&b)\s+(hits|songs|anthems|bangers|classics)/i,
+      /\b(top\s+\d+|now\s+that'?s)/i,
+      /\b(various\s+artists|va\s*[-–—])/i,
+    ];
+    
+    return compilationPatterns.some(pattern => pattern.test(albumName));
+  }
+
+  /**
+   * Normalizes artist name for comparison
+   * @param {string} name - Artist name
+   * @returns {string} Normalized name
+   */
+  static normalizeArtistName(name) {
+    if (!name) return '';
+    return name
+      .toLowerCase()
+      .replace(/[^\w\s]/g, '')  // Remove special chars
+      .replace(/\s+/g, ' ')     // Normalize spaces
+      .trim();
+  }
+
+  /**
+   * Checks if two artist names are similar enough to be the same
+   * @param {string} artist1 - First artist name
+   * @param {string} artist2 - Second artist name
+   * @returns {boolean} True if names match
+   */
+  static artistsMatch(artist1, artist2) {
+    const norm1 = this.normalizeArtistName(artist1);
+    const norm2 = this.normalizeArtistName(artist2);
+    
+    // Exact match
+    if (norm1 === norm2) return true;
+    
+    // One contains the other (for "Offset" vs "Offset (Rapper)")
+    if (norm1.includes(norm2) || norm2.includes(norm1)) return true;
+    
+    // Check first word match (for "The Beatles" vs "Beatles")
+    const words1 = norm1.split(' ').filter(w => w !== 'the');
+    const words2 = norm2.split(' ').filter(w => w !== 'the');
+    if (words1[0] === words2[0] && words1[0].length > 3) return true;
+    
+    return false;
+  }
+
+  /**
+   * Looks up track info from Last.fm to find the album name
+   * @param {string} artist - Artist name
+   * @param {string} track - Track title
+   * @returns {Promise<{album: string, albumArtist: string}|null>} Album info or null
+   */
+  static async lookupTrackInfo(artist, track) {
+    const apiKey = process.env.LASTFM_API_KEY;
+    if (!apiKey || !artist || !track) {
       return null;
     }
 
     try {
-      // Last.fm API endpoint for album info
-      const apiKey = process.env.LASTFM_API_KEY;
-      if (!apiKey) {
-        console.log(
-          '⚠️ LASTFM_API_KEY not found in .env file, skipping Last.fm lookup'
-        );
+      // For tracks with multiple artists, try with the first artist
+      const primaryArtist = artist.split(/[,&]|feat\.|ft\./i)[0].trim();
+      const encodedArtist = encodeURIComponent(primaryArtist);
+      const encodedTrack = encodeURIComponent(track);
+      const url = `https://ws.audioscrobbler.com/2.0/?method=track.getInfo&api_key=${apiKey}&artist=${encodedArtist}&track=${encodedTrack}&autocorrect=1&format=json`;
+
+      return new Promise((resolve) => {
+        const req = https.get(url, (res) => {
+          let data = '';
+          res.on('data', (chunk) => { data += chunk; });
+          res.on('end', () => {
+            try {
+              if (res.statusCode !== 200) {
+                resolve(null);
+                return;
+              }
+              const json = JSON.parse(data);
+              if (json.error || !json.track) {
+                resolve(null);
+                return;
+              }
+              
+              const albumInfo = json.track.album;
+              if (!albumInfo || !albumInfo.title) {
+                resolve(null);
+                return;
+              }
+
+              const albumTitle = albumInfo.title;
+              const albumArtist = albumInfo.artist || '';
+              
+              // Check if this looks like a compilation album
+              if (this.isCompilationAlbum(albumTitle)) {
+                console.log(`⚠️ Skipping compilation album: "${albumTitle}"`);
+                resolve(null);
+                return;
+              }
+              
+              // Check if album artist matches the track artist
+              // If it doesn't match, it's likely a compilation
+              if (albumArtist && !this.artistsMatch(primaryArtist, albumArtist)) {
+                console.log(`⚠️ Album artist mismatch: "${albumArtist}" vs "${primaryArtist}" - skipping "${albumTitle}"`);
+                resolve(null);
+                return;
+              }
+
+              console.log(`📀 Found album from Last.fm: "${albumTitle}" by ${albumArtist || primaryArtist}`);
+              resolve({
+                album: albumTitle,
+                albumArtist: albumArtist || primaryArtist,
+                image: albumInfo.image // Array of images
+              });
+            } catch {
+              resolve(null);
+            }
+          });
+        });
+        req.on('error', () => resolve(null));
+        req.setTimeout(5000, () => { req.destroy(); resolve(null); });
+      });
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Fetches high-resolution artwork from Last.fm API
+   * @param {string} artist - Artist name
+   * @param {string} album - Album name
+   * @param {string} track - Track title (optional, used to look up album if not provided)
+   * @returns {Promise<string|null>} Base64 artwork data or null
+   */
+  static async fetchHighResArtwork(artist, album, track = null) {
+    const apiKey = process.env.LASTFM_API_KEY;
+    if (!apiKey) {
+      console.log(
+        '⚠️ LASTFM_API_KEY not found in .env file, skipping Last.fm lookup'
+      );
+      return null;
+    }
+
+    if (!artist) {
+      console.log('Skipping Last.fm lookup: no artist provided');
+      return null;
+    }
+
+    // If album is missing or is "Unknown Album", try to look it up from track info
+    let albumToUse = album;
+    if (!album || album === 'Unknown Album' || album === '') {
+      if (track) {
+        console.log(`🔍 Looking up album for track: "${track}" by ${artist}`);
+        const trackInfo = await this.lookupTrackInfo(artist, track);
+        if (trackInfo && trackInfo.album) {
+          albumToUse = trackInfo.album;
+          
+          // If we got images directly from track.getInfo, try to use them
+          if (trackInfo.image && trackInfo.image.length > 0) {
+            for (const size of ['extralarge', 'large', 'medium']) {
+              const img = trackInfo.image.find((i) => i.size === size);
+              if (img && img['#text'] && img['#text'].trim() !== '' && 
+                  !img['#text'].includes('2a96cbd8b46e442fc41c2b86b821562f')) {
+                console.log(`Found ${size} image from track info`);
+                const imageData = await this.downloadImage(img['#text'].trim());
+                if (imageData) {
+                  return imageData;
+                }
+              }
+            }
+          }
+        } else {
+          console.log('Could not find album info from Last.fm');
+          return null;
+        }
+      } else {
+        console.log('Skipping Last.fm lookup: no album or track info');
         return null;
       }
-      const encodedArtist = encodeURIComponent(artist);
-      const encodedAlbum = encodeURIComponent(album);
+    }
+
+    try {
+      // For artists with multiple names, use the first one for API lookup
+      const primaryArtist = artist.split(/[,&]|feat\.|ft\./i)[0].trim();
+      const encodedArtist = encodeURIComponent(primaryArtist);
+      const encodedAlbum = encodeURIComponent(albumToUse);
       const url = `https://ws.audioscrobbler.com/2.0/?method=album.getinfo&api_key=${apiKey}&artist=${encodedArtist}&album=${encodedAlbum}&format=json`;
 
-      console.log(`🔍 Fetching artwork from Last.fm for: ${artist} - ${album}`);
+      console.log(`🔍 Fetching artwork from Last.fm for: ${primaryArtist} - ${albumToUse}`);
 
       return new Promise((resolve) => {
         const req = https.get(url, (res) => {
@@ -361,42 +727,68 @@ class NowPlayingService {
    * Checks for existing high-res cover first, then tries Last.fm, falls back to artworkData
    * @param {string} artist - Artist name (optional, for Last.fm lookup)
    * @param {string} album - Album name (optional, for Last.fm lookup)
-   * @returns {Promise<{data: string|null, isHighRes: boolean}>} Artwork data and quality flag
+   * @param {string} track - Track title (optional, for Last.fm lookup when album is missing)
+   * @param {string} windowsThumbnail - Thumbnail from Windows SMTC (optional)
+   * @returns {Promise<{data: string|null, isHighRes: boolean, albumName: string|null}>} Artwork data and quality flag
    */
-  static async getArtworkData(artist = null, album = null) {
+  static async getArtworkData(artist = null, album = null, track = null, windowsThumbnail = null) {
     try {
+      let resolvedAlbum = album;
+      
       // First check if a high-resolution cover already exists
-      if (album && (await this.hasHighResCover(album))) {
+      if (album && album !== 'Unknown Album' && album !== '' && (await this.hasHighResCover(album))) {
         console.log(
           '✅ High-resolution cover already exists, skipping API request'
         );
         // Return null data - the cover path will be handled by saveCover
-        return { data: null, isHighRes: true };
+        return { data: null, isHighRes: true, albumName: album };
       }
 
       // If no high-res cover exists, try to fetch from Last.fm
-      if (artist && album) {
-        const highResArtwork = await this.fetchHighResArtwork(artist, album);
+      if (artist) {
+        const highResArtwork = await this.fetchHighResArtwork(artist, album, track);
         if (highResArtwork) {
           console.log('✅ Fetched high-resolution artwork from Last.fm');
-          return { data: highResArtwork, isHighRes: true };
+          
+          // If we looked up the album, try to get the resolved album name
+          if ((!album || album === 'Unknown Album' || album === '') && track) {
+            const trackInfo = await this.lookupTrackInfo(artist, track);
+            if (trackInfo && trackInfo.album) {
+              resolvedAlbum = trackInfo.album;
+            }
+          }
+          
+          return { data: highResArtwork, isHighRes: true, albumName: resolvedAlbum };
         }
       }
 
-      // Fallback to artworkData (150x150 from nowplaying-cli)
-      const artworkData = await execPromise('nowplaying-cli get artworkData');
-
-      if (!artworkData || artworkData === 'null' || artworkData === '') {
-        return { data: null, isHighRes: false };
+      // Try to use Windows thumbnail if available
+      if (windowsThumbnail) {
+        console.log('🖼️ Using thumbnail from Windows media session');
+        return { data: windowsThumbnail, isHighRes: false, albumName: resolvedAlbum };
       }
 
-      console.log(
-        '⚠️ Using low-resolution artwork from nowplaying-cli (150x150)'
-      );
-      return { data: artworkData, isHighRes: false };
+      // On macOS, try to get artwork from nowplaying-cli as fallback
+      if (IS_MAC) {
+        try {
+          const artworkData = await execPromise('nowplaying-cli get artworkData');
+
+          if (artworkData && artworkData !== 'null' && artworkData !== '') {
+            console.log(
+              '⚠️ Using low-resolution artwork from nowplaying-cli (150x150)'
+            );
+            return { data: artworkData, isHighRes: false, albumName: resolvedAlbum };
+          }
+        } catch (error) {
+          console.warn('Error getting artwork from nowplaying-cli:', error.message);
+        }
+      }
+
+      // No artwork available
+      return { data: null, isHighRes: false, albumName: resolvedAlbum };
     } catch (error) {
       console.warn('Error getting artwork:', error.message);
-      return { data: null, isHighRes: false };
+      return { data: null, isHighRes: false, albumName: album };
     }
   }
 }
@@ -414,17 +806,30 @@ class CoverService {
   }
 
   /**
+   * Generates a unique cover filename
+   * @param {string} album - Album name
+   * @param {string} artist - Artist name (fallback if album is empty)
+   * @param {string} title - Track title (fallback if album is empty)
+   * @returns {string} Filename for the cover
+   */
+  static getCoverFilename(album, artist = '', title = '') {
+    return getCoverFilenameForTrack(album, artist, title);
+  }
+
+  /**
    * Saves album cover to disk
    * @param {string} album - Album name
    * @param {string} artworkData - Base64 artwork data
    * @param {boolean} isHighRes - Whether this is a high-resolution image
+   * @param {string} artist - Artist name (for fallback filename)
+   * @param {string} title - Track title (for fallback filename)
    * @returns {Promise<string|null>} Relative path to saved cover or null
    */
-  static async saveCover(album, artworkData, isHighRes = false) {
+  static async saveCover(album, artworkData, isHighRes = false, artist = '', title = '') {
     if (!artworkData) return null;
 
     try {
-      const filename = `${sanitizeFilename(album)}.png`;
+      const filename = this.getCoverFilename(album, artist, title);
       const coverPath = path.join(__dirname, CONSTANTS.PATHS.COVERS, filename);
 
       // Remove data:image prefix if present
@@ -437,15 +842,12 @@ class CoverService {
         const existingSize = existingStats.size;
         const newSize = buffer.length;
 
-        // If existing cover is low quality (small file size, typically < 20KB for 150x150)
-        // and we're trying to save a high-quality one, delete the old one
-        if (isHighRes && existingSize < 20000 && newSize > existingSize) {
+        // If we're saving a high-res cover and it's bigger than existing, replace
+        if (isHighRes && newSize > existingSize) {
           console.log(
-            `Deleting low-quality cover (${(existingSize / 1024).toFixed(
+            `Replacing cover with higher quality (${(existingSize / 1024).toFixed(
               2
-            )} KB) and replacing with high-quality (${(newSize / 1024).toFixed(
-              2
-            )} KB)`
+            )} KB → ${(newSize / 1024).toFixed(2)} KB)`
           );
           await fs.unlink(coverPath);
         } else if (!isHighRes && existingSize > 20000) {
@@ -456,12 +858,12 @@ class CoverService {
             ).toFixed(2)} KB)`
           );
           return `${CONSTANTS.PATHS.COVERS}/${filename}`;
-        } else {
+        } else if (newSize <= existingSize) {
           // Same quality or better quality already exists
           console.log(
             `Cover already exists: ${filename} (${(existingSize / 1024).toFixed(
               2
-            )} KB)`
+            )} KB, new would be ${(newSize / 1024).toFixed(2)} KB)`
           );
           return `${CONSTANTS.PATHS.COVERS}/${filename}`;
         }
@@ -770,7 +1172,7 @@ class RatingService {
         mood, // Most recent mood/vibe
         flag: track.flag,
         favorite: track.favorite,
-        coverPath: `covers/${sanitizeFilename(track.album)}.png`,
+        coverPath: `covers/${getCoverFilenameForTrack(track.album, track.artist, track.title)}`,
       };
     });
 
@@ -978,7 +1380,7 @@ class RatingService {
         if (trackWithCover && trackWithCover.coverPath) {
           coverPath = trackWithCover.coverPath;
         } else {
-          coverPath = `covers/${sanitizeFilename(album.album)}.png`;
+          coverPath = `covers/${getCoverFilenameForTrack(album.album, album.artist, '')}`;  // Albums use album name primarily
         }
       }
 
@@ -1072,7 +1474,8 @@ class RatingService {
  * Creates the main application window
  */
 function createWindow() {
-  mainWindow = new BrowserWindow({
+  // Platform-specific window options
+  const windowOptions = {
     width: CONSTANTS.WINDOW.WIDTH,
     height: CONSTANTS.WINDOW.HEIGHT,
     minWidth: CONSTANTS.WINDOW.MIN_WIDTH,
@@ -1082,9 +1485,21 @@ function createWindow() {
       nodeIntegration: true,
       contextIsolation: false,
     },
-    titleBarStyle: 'hiddenInset',
     show: false,
-  });
+  };
+
+  // macOS-specific: hidden title bar with inset traffic lights
+  if (IS_MAC) {
+    windowOptions.titleBarStyle = 'hiddenInset';
+  }
+
+  // Windows-specific: frame with custom styling
+  if (IS_WINDOWS) {
+    windowOptions.frame = true;
+    windowOptions.autoHideMenuBar = true;
+  }
+
+  mainWindow = new BrowserWindow(windowOptions);
 
   mainWindow.loadFile('renderer/index.html');
 
@@ -1105,6 +1520,39 @@ function createWindow() {
  * Registers all IPC handlers
  */
 function registerIpcHandlers() {
+  // Get platform info
+  ipcMain.handle('getPlatform', async () => {
+    return {
+      platform: process.platform,
+      isMac: IS_MAC,
+      isWindows: IS_WINDOWS,
+    };
+  });
+
+  // Set manual track (for Windows)
+  ipcMain.handle('setManualTrack', async (event, trackInfo) => {
+    try {
+      NowPlayingService.setManualTrack(trackInfo);
+      return { success: true };
+    } catch (error) {
+      console.error('IPC Error - setManualTrack:', error);
+      return { success: false, message: error.message };
+    }
+  });
+
+  // Clear manual track
+  ipcMain.handle('clearManualTrack', async () => {
+    try {
+      NowPlayingService.clearManualTrack();
+      // Clear the track cache as well
+      lastTrackCache = null;
+      return { success: true };
+    } catch (error) {
+      console.error('IPC Error - clearManualTrack:', error);
+      return { success: false, message: error.message };
+    }
+  });
+
   // Get current track with cover
   ipcMain.handle('getCurrentTrack', async () => {
     try {
@@ -1118,10 +1566,14 @@ function registerIpcHandlers() {
 
       console.log(`🎵 Track changed: ${trackInfo.title} - ${trackInfo.artist}`);
 
+      // Get artwork - pass track title for album lookup, and Windows thumbnail as fallback
       const artworkResult = await NowPlayingService.getArtworkData(
         trackInfo.artist,
-        trackInfo.album
+        trackInfo.album,
+        trackInfo.title,  // Pass track title for album lookup
+        trackInfo.thumbnail  // Pass Windows thumbnail as fallback
       );
+      
       if (artworkResult.data) {
         console.log(
           `Artwork data received: ${(artworkResult.data.length / 1024).toFixed(
@@ -1130,25 +1582,33 @@ function registerIpcHandlers() {
         );
       }
 
+      // Use the resolved album name if available (from Last.fm lookup)
+      const albumName = artworkResult.albumName || trackInfo.album;
+
       // If we have high-res cover but no data (already exists), get the path directly
       let coverPath;
       if (artworkResult.isHighRes && !artworkResult.data) {
         // High-res cover exists, get the path without saving
-        const filename = `${sanitizeFilename(trackInfo.album)}.png`;
+        const filename = CoverService.getCoverFilename(albumName, trackInfo.artist, trackInfo.title);
         coverPath = `${CONSTANTS.PATHS.COVERS}/${filename}`;
       } else {
         // Save the cover (or skip if already exists)
         coverPath = await CoverService.saveCover(
-          trackInfo.album,
+          albumName,
           artworkResult.data,
-          artworkResult.isHighRes
+          artworkResult.isHighRes,
+          trackInfo.artist,
+          trackInfo.title
         );
       }
 
       const result = {
         ...trackInfo,
+        album: albumName,  // Use resolved album name
         coverPath,
       };
+
+      console.log(`📁 Cover path: ${coverPath}, Album: ${albumName}`);
 
       lastTrackCache = {
         key: trackKey,
@@ -1157,7 +1617,10 @@ function registerIpcHandlers() {
 
       return result;
     } catch (error) {
-      console.error('IPC Error - getCurrentTrack:', error);
+      // Don't log MANUAL_ENTRY_REQUIRED as an error - it's expected on Windows
+      if (error.message !== 'MANUAL_ENTRY_REQUIRED') {
+        console.error('IPC Error - getCurrentTrack:', error);
+      }
       throw error;
     }
   });

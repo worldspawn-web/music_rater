@@ -6,7 +6,9 @@
   "main": "main.js",
   "scripts": {
     "start": "electron .",
-    "build:mac": "electron-builder --mac"
+    "build:mac": "electron-builder --mac",
+    "build:win": "electron-builder --win",
+    "build": "electron-builder --mac --win"
   },
   "build": {
     "appId": "com.worldspawn.yandexrater",
@@ -15,6 +17,14 @@
       "target": "dmg",
       "icon": "public/icon.jpg",
       "category": "public.app-category.music"
+    },
+    "win": {
+      "target": "nsis",
+      "icon": "public/icon.jpg"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
     }
   },
   "dependencies": {

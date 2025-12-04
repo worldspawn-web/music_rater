@@ -286,16 +286,58 @@ const ALL_COUNTRIES = [
 ];
 
 /**
- * Converts country code to flag emoji
- * @param {string} countryCode - ISO 3166-1 alpha-2 country code or custom code
- * @returns {string} Flag emoji
+ * Converts country code to Twemoji codepoint format
+ * @param {string} countryCode - ISO 3166-1 alpha-2 country code
+ * @returns {string} Twemoji codepoint (e.g., "1f1fa-1f1f8" for US)
  */
-function getFlagEmoji(countryCode) {
+function getTwemojiCodepoint(countryCode) {
+  if (!countryCode) return '';
+  
+  // Convert country code to regional indicator codepoints
+  // A = U+1F1E6, B = U+1F1E7, etc.
+  const codePoints = countryCode
+    .toUpperCase()
+    .split('')
+    .map(char => (0x1F1E6 + char.charCodeAt(0) - 65).toString(16));
+  
+  return codePoints.join('-');
+}
+
+/**
+ * Gets Twemoji image URL for a country code
+ * @param {string} countryCode - ISO 3166-1 alpha-2 country code
+ * @returns {string} Twemoji CDN URL
+ */
+function getTwemojiUrl(countryCode) {
+  const codepoint = getTwemojiCodepoint(countryCode);
+  // Using jsDelivr CDN for Twemoji
+  return `https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/${codepoint}.png`;
+}
+
+/**
+ * Converts country code to flag emoji (native) or returns code for image fallback
+ * @param {string} countryCode - ISO 3166-1 alpha-2 country code or custom code
+ * @param {boolean} useImage - If true, returns HTML img tag instead of emoji
+ * @returns {string} Flag emoji or HTML img tag
+ */
+function getFlagEmoji(countryCode, useImage = false) {
   if (!countryCode) return '';
   
   // Check for custom flags first
   if (CUSTOM_FLAGS[countryCode]) {
+    if (useImage) {
+      // Custom flags don't have Twemoji images, use emoji with fallback styling
+      return `<span class="flag-emoji-fallback">${CUSTOM_FLAGS[countryCode].emoji}</span>`;
+    }
     return CUSTOM_FLAGS[countryCode].emoji;
+  }
+  
+  // For image mode, return an img tag with Twemoji
+  if (useImage) {
+    const url = getTwemojiUrl(countryCode);
+    const country = ALL_COUNTRIES.find(c => c.code === countryCode);
+    const countryName = country ? country.name : countryCode;
+    return `<img src="${url}" alt="${countryName}" class="flag-twemoji" loading="lazy" />`;
   }
   
   // Convert country code (e.g., 'US', 'RU') to flag emoji
@@ -304,6 +346,15 @@ function getFlagEmoji(countryCode) {
     .split('')
     .map(char => 127397 + char.charCodeAt(0));
   return String.fromCodePoint(...codePoints);
+}
+
+/**
+ * Gets flag as HTML (always uses Twemoji image for cross-platform support)
+ * @param {string} countryCode - ISO 3166-1 alpha-2 country code or custom code
+ * @returns {string} HTML string with flag image
+ */
+function getFlagHtml(countryCode) {
+  return getFlagEmoji(countryCode, true);
 }
 
 /**
@@ -391,6 +442,8 @@ try {
   if (typeof window !== 'undefined') {
     window.FlagUtils = {
       getFlagEmoji,
+      getFlagHtml,
+      getTwemojiUrl,
       getCountryName,
       searchCountries,
       getUsedFlags,
@@ -405,14 +458,24 @@ try {
   // Try to export anyway with minimal functionality
   if (typeof window !== 'undefined') {
     window.FlagUtils = {
-      getFlagEmoji: (code) => {
+      getFlagEmoji: (code, useImage = false) => {
         if (!code) return '';
         try {
+          if (useImage) {
+            const codePoints = code.toUpperCase().split('').map(char => (0x1F1E6 + char.charCodeAt(0) - 65).toString(16));
+            const url = `https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/${codePoints.join('-')}.png`;
+            return `<img src="${url}" alt="${code}" class="flag-twemoji" />`;
+          }
           const codePoints = code.toUpperCase().split('').map(char => 127397 + char.charCodeAt(0));
           return String.fromCodePoint(...codePoints);
         } catch (e) {
           return '';
         }
+      },
+      getFlagHtml: (code) => window.FlagUtils.getFlagEmoji(code, true),
+      getTwemojiUrl: (code) => {
+        const codePoints = code.toUpperCase().split('').map(char => (0x1F1E6 + char.charCodeAt(0) - 65).toString(16));
+        return `https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/${codePoints.join('-')}.png`;
       },
       getCountryName: (code) => code || '',
       searchCountries: () => [],
@@ -428,6 +491,8 @@ try {
   if (typeof module !== 'undefined' && module.exports) {
     module.exports = {
       getFlagEmoji,
+      getFlagHtml,
+      getTwemojiUrl,
       getCountryName,
       searchCountries,
       getUsedFlags,
