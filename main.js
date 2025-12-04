@@ -57,14 +57,33 @@ let lastTrackCache = null;
  */
 function sanitizeFilename(str) {
   const crypto = require('crypto');
-  const hash = crypto.createHash('md5').update(str).digest('hex');
-  const safe = str
+  const safeStr = str || '';
+  const hash = crypto.createHash('md5').update(safeStr).digest('hex');
+  const safe = safeStr
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
     .replace(/[^a-z0-9]/gi, '_')
     .toLowerCase()
     .substring(0, 50);
   return `${safe}_${hash.substring(0, 8)}`;
+}
+
+/**
+ * Gets the cover filename for a track
+ * Uses album if available, otherwise falls back to artist + title
+ * @param {string} album - Album name
+ * @param {string} artist - Artist name
+ * @param {string} title - Track title
+ * @returns {string} Cover filename (without path)
+ */
+function getCoverFilenameForTrack(album, artist, title) {
+  // If we have a valid album name, use it
+  if (album && album.trim() !== '') {
+    return `${sanitizeFilename(album)}.png`;
+  }
+  // Fallback: use artist + title combination
+  const fallbackKey = `${artist || 'unknown'} - ${title || 'unknown'}`;
+  return `track_${sanitizeFilename(fallbackKey)}.png`;
 }
 
 /**
@@ -787,17 +806,30 @@ class CoverService {
   }
 
   /**
+   * Generates a unique cover filename
+   * @param {string} album - Album name
+   * @param {string} artist - Artist name (fallback if album is empty)
+   * @param {string} title - Track title (fallback if album is empty)
+   * @returns {string} Filename for the cover
+   */
+  static getCoverFilename(album, artist = '', title = '') {
+    return getCoverFilenameForTrack(album, artist, title);
+  }
+
+  /**
    * Saves album cover to disk
    * @param {string} album - Album name
    * @param {string} artworkData - Base64 artwork data
    * @param {boolean} isHighRes - Whether this is a high-resolution image
+   * @param {string} artist - Artist name (for fallback filename)
+   * @param {string} title - Track title (for fallback filename)
    * @returns {Promise<string|null>} Relative path to saved cover or null
    */
-  static async saveCover(album, artworkData, isHighRes = false) {
+  static async saveCover(album, artworkData, isHighRes = false, artist = '', title = '') {
     if (!artworkData) return null;
 
     try {
-      const filename = `${sanitizeFilename(album)}.png`;
+      const filename = this.getCoverFilename(album, artist, title);
       const coverPath = path.join(__dirname, CONSTANTS.PATHS.COVERS, filename);
 
       // Remove data:image prefix if present
@@ -1140,7 +1172,7 @@ class RatingService {
         mood, // Most recent mood/vibe
         flag: track.flag,
         favorite: track.favorite,
-        coverPath: `covers/${sanitizeFilename(track.album)}.png`,
+        coverPath: `covers/${getCoverFilenameForTrack(track.album, track.artist, track.title)}`,
       };
     });
 
@@ -1348,7 +1380,7 @@ class RatingService {
         if (trackWithCover && trackWithCover.coverPath) {
           coverPath = trackWithCover.coverPath;
         } else {
-          coverPath = `covers/${sanitizeFilename(album.album)}.png`;
+          coverPath = `covers/${getCoverFilenameForTrack(album.album, album.artist, '')}`;  // Albums use album name primarily
         }
       }
 
@@ -1557,14 +1589,16 @@ function registerIpcHandlers() {
       let coverPath;
       if (artworkResult.isHighRes && !artworkResult.data) {
         // High-res cover exists, get the path without saving
-        const filename = `${sanitizeFilename(albumName)}.png`;
+        const filename = CoverService.getCoverFilename(albumName, trackInfo.artist, trackInfo.title);
         coverPath = `${CONSTANTS.PATHS.COVERS}/${filename}`;
       } else {
         // Save the cover (or skip if already exists)
         coverPath = await CoverService.saveCover(
           albumName,
           artworkResult.data,
-          artworkResult.isHighRes
+          artworkResult.isHighRes,
+          trackInfo.artist,
+          trackInfo.title
         );
       }
 
