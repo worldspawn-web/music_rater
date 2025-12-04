@@ -10,6 +10,13 @@ const https = require('https');
 const http = require('http');
 
 // ============================================================================
+// PLATFORM DETECTION
+// ============================================================================
+
+const IS_MAC = process.platform === 'darwin';
+const IS_WINDOWS = process.platform === 'win32';
+
+// ============================================================================
 // CONSTANTS
 // ============================================================================
 
@@ -63,16 +70,19 @@ function sanitizeFilename(str) {
 /**
  * Executes a shell command and returns a promise
  * @param {string} command - Command to execute
+ * @param {Object} options - Optional exec options
  * @returns {Promise<string>} Command output
  */
-function execPromise(command) {
+function execPromise(command, options = {}) {
   return new Promise((resolve, reject) => {
-    exec(command, (error, stdout, stderr) => {
+    exec(command, { encoding: 'utf8', ...options }, (error, stdout, stderr) => {
       if (error) {
-        reject(new Error(`Command failed: ${error.message}`));
+        // Include stderr in error for better debugging
+        const errorMsg = stderr ? `${error.message}\nStderr: ${stderr}` : error.message;
+        reject(new Error(`Command failed: ${errorMsg}`));
         return;
       }
-      if (stderr) {
+      if (stderr && !options.ignoreStderr) {
         console.warn(`Command stderr: ${stderr}`);
       }
       resolve(stdout.trim());
@@ -124,15 +134,175 @@ async function writeJsonFile(filePath, data) {
 // SERVICES
 // ============================================================================
 
+// Store for manual track entry (used as fallback on Windows)
+let manualTrackInfo = null;
+
+// Cache for Python availability check
+let pythonCommand = null;
+let pythonChecked = false;
+
 /**
- * Service for interacting with nowplaying-cli
+ * Checks if Python is available and finds the correct command
+ * @returns {Promise<string|null>} Python command or null
+ */
+async function findPythonCommand() {
+  if (pythonChecked) {
+    return pythonCommand;
+  }
+  
+  const commands = ['python', 'python3', 'py'];
+  
+  for (const cmd of commands) {
+    try {
+      await execPromise(`${cmd} --version`);
+      pythonCommand = cmd;
+      pythonChecked = true;
+      console.log(`✅ Found Python: ${cmd}`);
+      return pythonCommand;
+    } catch {
+      // Try next command
+    }
+  }
+  
+  pythonChecked = true;
+  console.warn('⚠️ Python not found. Manual track entry will be used on Windows.');
+  return null;
+}
+
+/**
+ * Gets currently playing media on Windows using Python helper
+ * @returns {Promise<Object|null>} Track info or null
+ */
+async function getWindowsNowPlaying() {
+  const python = await findPythonCommand();
+  
+  if (!python) {
+    return null;
+  }
+  
+  try {
+    const scriptPath = path.join(__dirname, 'scripts', 'get_now_playing.py');
+    
+    // Use spawn-like approach for better Windows compatibility
+    const output = await new Promise((resolve, reject) => {
+      const { spawn } = require('child_process');
+      const proc = spawn(python, [scriptPath], {
+        encoding: 'utf8',
+        shell: true,
+        windowsHide: true,
+      });
+      
+      let stdout = '';
+      let stderr = '';
+      
+      proc.stdout.on('data', (data) => {
+        stdout += data.toString();
+      });
+      
+      proc.stderr.on('data', (data) => {
+        stderr += data.toString();
+      });
+      
+      proc.on('close', (code) => {
+        if (code !== 0 && stderr) {
+          reject(new Error(stderr));
+        } else {
+          resolve(stdout.trim());
+        }
+      });
+      
+      proc.on('error', (err) => {
+        reject(err);
+      });
+      
+      // Timeout after 5 seconds
+      setTimeout(() => {
+        proc.kill();
+        reject(new Error('Python script timeout'));
+      }, 5000);
+    });
+    
+    if (!output || output === 'null') {
+      return null;
+    }
+    
+    const data = JSON.parse(output);
+    
+    // Check for errors from the Python script
+    if (data.error) {
+      if (data.error === 'WINRT_NOT_INSTALLED') {
+        console.warn('⚠️ WinRT packages not installed. Run: pip install -r scripts/requirements.txt');
+      } else {
+        console.warn(`⚠️ Python script error: ${data.message}`);
+      }
+      return null;
+    }
+    
+    return data;
+  } catch (error) {
+    // Don't spam the console with errors - this is checked frequently
+    if (!error.message.includes('No media') && !error.message.includes('null')) {
+      console.debug('Windows now playing error:', error.message);
+    }
+    return null;
+  }
+}
+
+/**
+ * Service for interacting with nowplaying-cli (macOS) or Python helper (Windows)
  */
 class NowPlayingService {
+  /**
+   * Sets manual track information (fallback for Windows if Python not available)
+   * @param {Object} trackInfo - Track information {title, artist, album}
+   */
+  static setManualTrack(trackInfo) {
+    manualTrackInfo = trackInfo;
+    console.log(`📝 Manual track set: ${trackInfo.title} - ${trackInfo.artist}`);
+  }
+
+  /**
+   * Clears manual track information
+   */
+  static clearManualTrack() {
+    manualTrackInfo = null;
+    console.log('📝 Manual track cleared');
+  }
+
   /**
    * Gets current track information
    * @returns {Promise<Object>} Track information
    */
   static async getCurrentTrack() {
+    // On Windows, try Python helper first, then fall back to manual entry
+    if (IS_WINDOWS) {
+      // Try automatic detection via Python
+      const windowsTrack = await getWindowsNowPlaying();
+      
+      if (windowsTrack && windowsTrack.title && windowsTrack.artist) {
+        return {
+          title: windowsTrack.title,
+          artist: windowsTrack.artist,
+          album: windowsTrack.album || 'Unknown Album',
+          isPlaying: windowsTrack.isPlaying,
+          sourceApp: windowsTrack.sourceApp,
+        };
+      }
+      
+      // Fall back to manual track entry if set
+      if (manualTrackInfo) {
+        return {
+          title: manualTrackInfo.title,
+          artist: manualTrackInfo.artist,
+          album: manualTrackInfo.album || 'Unknown Album',
+        };
+      }
+      
+      // No track available - renderer will show manual entry UI
+      throw new Error('MANUAL_ENTRY_REQUIRED');
+    }
+
+    // On macOS, use nowplaying-cli
     try {
       const title = await execPromise('nowplaying-cli get title');
       const album = await execPromise('nowplaying-cli get album');
@@ -383,17 +553,24 @@ class NowPlayingService {
         }
       }
 
-      // Fallback to artworkData (150x150 from nowplaying-cli)
-      const artworkData = await execPromise('nowplaying-cli get artworkData');
+      // On macOS, try to get artwork from nowplaying-cli as fallback
+      if (IS_MAC) {
+        try {
+          const artworkData = await execPromise('nowplaying-cli get artworkData');
 
-      if (!artworkData || artworkData === 'null' || artworkData === '') {
-        return { data: null, isHighRes: false };
+          if (artworkData && artworkData !== 'null' && artworkData !== '') {
+            console.log(
+              '⚠️ Using low-resolution artwork from nowplaying-cli (150x150)'
+            );
+            return { data: artworkData, isHighRes: false };
+          }
+        } catch (error) {
+          console.warn('Error getting artwork from nowplaying-cli:', error.message);
+        }
       }
 
-      console.log(
-        '⚠️ Using low-resolution artwork from nowplaying-cli (150x150)'
-      );
-      return { data: artworkData, isHighRes: false };
+      // No artwork available
+      return { data: null, isHighRes: false };
     } catch (error) {
       console.warn('Error getting artwork:', error.message);
       return { data: null, isHighRes: false };
@@ -1072,7 +1249,8 @@ class RatingService {
  * Creates the main application window
  */
 function createWindow() {
-  mainWindow = new BrowserWindow({
+  // Platform-specific window options
+  const windowOptions = {
     width: CONSTANTS.WINDOW.WIDTH,
     height: CONSTANTS.WINDOW.HEIGHT,
     minWidth: CONSTANTS.WINDOW.MIN_WIDTH,
@@ -1082,9 +1260,21 @@ function createWindow() {
       nodeIntegration: true,
       contextIsolation: false,
     },
-    titleBarStyle: 'hiddenInset',
     show: false,
-  });
+  };
+
+  // macOS-specific: hidden title bar with inset traffic lights
+  if (IS_MAC) {
+    windowOptions.titleBarStyle = 'hiddenInset';
+  }
+
+  // Windows-specific: frame with custom styling
+  if (IS_WINDOWS) {
+    windowOptions.frame = true;
+    windowOptions.autoHideMenuBar = true;
+  }
+
+  mainWindow = new BrowserWindow(windowOptions);
 
   mainWindow.loadFile('renderer/index.html');
 
@@ -1105,6 +1295,39 @@ function createWindow() {
  * Registers all IPC handlers
  */
 function registerIpcHandlers() {
+  // Get platform info
+  ipcMain.handle('getPlatform', async () => {
+    return {
+      platform: process.platform,
+      isMac: IS_MAC,
+      isWindows: IS_WINDOWS,
+    };
+  });
+
+  // Set manual track (for Windows)
+  ipcMain.handle('setManualTrack', async (event, trackInfo) => {
+    try {
+      NowPlayingService.setManualTrack(trackInfo);
+      return { success: true };
+    } catch (error) {
+      console.error('IPC Error - setManualTrack:', error);
+      return { success: false, message: error.message };
+    }
+  });
+
+  // Clear manual track
+  ipcMain.handle('clearManualTrack', async () => {
+    try {
+      NowPlayingService.clearManualTrack();
+      // Clear the track cache as well
+      lastTrackCache = null;
+      return { success: true };
+    } catch (error) {
+      console.error('IPC Error - clearManualTrack:', error);
+      return { success: false, message: error.message };
+    }
+  });
+
   // Get current track with cover
   ipcMain.handle('getCurrentTrack', async () => {
     try {
@@ -1157,7 +1380,10 @@ function registerIpcHandlers() {
 
       return result;
     } catch (error) {
-      console.error('IPC Error - getCurrentTrack:', error);
+      // Don't log MANUAL_ENTRY_REQUIRED as an error - it's expected on Windows
+      if (error.message !== 'MANUAL_ENTRY_REQUIRED') {
+        console.error('IPC Error - getCurrentTrack:', error);
+      }
       throw error;
     }
   });

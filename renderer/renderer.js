@@ -4,6 +4,9 @@ if (typeof window !== 'undefined') {
   window.ipcRenderer = ipcRenderer;
 }
 
+// Platform detection - will be populated on init
+let platformInfo = { isWindows: false, isMac: true };
+
 // Переключение вкладок
 document.querySelectorAll('.nav-tab').forEach((button) => {
   button.addEventListener('click', () => {
@@ -304,9 +307,176 @@ async function updateMultiArtistDisplay(artistElement, artists, artistRatingData
 }
 
 /**
+ * Shows manual track entry UI for Windows
+ */
+function showManualTrackEntry() {
+  previousTrackKey = null;
+  currentTrackInfo = null;
+  currentRating = null;
+
+  const titleEl = document.getElementById('track-title');
+  const artistEl = document.getElementById('track-artist');
+  const albumEl = document.getElementById('track-album');
+  const albumCover = document.getElementById('album-cover');
+  const noCover = document.getElementById('no-cover');
+  const background = document.getElementById('dynamic-background');
+
+  // Check if manual entry form already exists
+  let manualEntryForm = document.getElementById('manual-track-entry');
+  if (!manualEntryForm) {
+    // Create manual entry form
+    manualEntryForm = document.createElement('div');
+    manualEntryForm.id = 'manual-track-entry';
+    manualEntryForm.className = 'manual-track-entry glass-card';
+    manualEntryForm.innerHTML = `
+      <h3 class="manual-entry-title">Ожидание воспроизведения...</h3>
+      <div class="manual-entry-status">
+        <div class="status-icon">🎵</div>
+        <p class="status-text">Включите музыку в любом приложении (Spotify, Yandex Music, браузер и т.д.)</p>
+      </div>
+      <div class="manual-entry-divider">
+        <span>или введите вручную</span>
+      </div>
+      <details class="manual-entry-details">
+        <summary class="manual-entry-summary">Ручной ввод трека</summary>
+        <div class="manual-entry-fields">
+          <div class="manual-entry-field">
+            <label for="manual-title">Название трека *</label>
+            <input type="text" id="manual-title" class="text-input" placeholder="Например: Bohemian Rhapsody" required>
+          </div>
+          <div class="manual-entry-field">
+            <label for="manual-artist">Исполнитель *</label>
+            <input type="text" id="manual-artist" class="text-input" placeholder="Например: Queen" required>
+          </div>
+          <div class="manual-entry-field">
+            <label for="manual-album">Альбом</label>
+            <input type="text" id="manual-album" class="text-input" placeholder="Например: A Night at the Opera">
+          </div>
+        </div>
+        <div class="manual-entry-actions">
+          <button id="manual-entry-submit" class="primary-button">Применить</button>
+          <button id="manual-entry-clear" class="secondary-button">Сбросить</button>
+        </div>
+      </details>
+      <details class="manual-entry-details setup-details">
+        <summary class="manual-entry-summary">⚙️ Настройка автоопределения</summary>
+        <div class="setup-instructions">
+          <p>Для автоматического определения трека нужен Python с пакетами WinRT:</p>
+          <ol>
+            <li>Установите <a href="https://www.python.org/downloads/" target="_blank">Python</a> (если не установлен)</li>
+            <li>Откройте терминал и выполните:</li>
+          </ol>
+          <code class="setup-command">pip install winrt-Windows.Media.Control winrt-Windows.Foundation</code>
+          <p class="setup-note">После установки перезапустите приложение.</p>
+        </div>
+      </details>
+    `;
+    
+    // Insert after track-info
+    const trackInfo = document.querySelector('.track-info');
+    if (trackInfo) {
+      trackInfo.insertAdjacentElement('afterend', manualEntryForm);
+    }
+    
+    // Add event listeners
+    document.getElementById('manual-entry-submit').addEventListener('click', submitManualTrack);
+    document.getElementById('manual-entry-clear').addEventListener('click', clearManualTrack);
+    
+    // Allow Enter key to submit
+    ['manual-title', 'manual-artist', 'manual-album'].forEach(id => {
+      document.getElementById(id).addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+          submitManualTrack();
+        }
+      });
+    });
+  }
+  
+  // Show the form
+  manualEntryForm.style.display = 'block';
+
+  if (titleEl) {
+    titleEl.textContent = 'Сейчас ничего не играет';
+  }
+  if (artistEl) {
+    artistEl.textContent = '';
+  }
+  if (albumEl) {
+    albumEl.textContent = '';
+  }
+
+  if (albumCover && noCover && background) {
+    albumCover.style.display = 'none';
+    noCover.style.display = 'flex';
+    background.classList.remove('active');
+  }
+
+  resetRatingButtons();
+}
+
+/**
+ * Submits manually entered track info
+ */
+async function submitManualTrack() {
+  const title = document.getElementById('manual-title').value.trim();
+  const artist = document.getElementById('manual-artist').value.trim();
+  const album = document.getElementById('manual-album').value.trim();
+  
+  if (!title || !artist) {
+    alert('Пожалуйста, введите название трека и исполнителя');
+    return;
+  }
+  
+  const trackInfo = {
+    title,
+    artist,
+    album: album || 'Unknown Album'
+  };
+  
+  try {
+    const result = await ipcRenderer.invoke('setManualTrack', trackInfo);
+    if (result.success) {
+      // Hide manual entry form
+      const form = document.getElementById('manual-track-entry');
+      if (form) {
+        form.style.display = 'none';
+      }
+      // Fetch the track to display it
+      await fetchCurrentTrack();
+    }
+  } catch (error) {
+    console.error('Error setting manual track:', error);
+    alert('Ошибка при установке трека');
+  }
+}
+
+/**
+ * Clears manually entered track and shows entry form again
+ */
+async function clearManualTrack() {
+  try {
+    await ipcRenderer.invoke('clearManualTrack');
+    // Clear input fields
+    document.getElementById('manual-title').value = '';
+    document.getElementById('manual-artist').value = '';
+    document.getElementById('manual-album').value = '';
+    // Reset display
+    showManualTrackEntry();
+  } catch (error) {
+    console.error('Error clearing manual track:', error);
+  }
+}
+
+/**
  * Показывает состояние, когда сейчас ничего не играет
  */
 function showNoTrackPlaying() {
+  // On Windows, show manual entry UI instead
+  if (platformInfo.isWindows) {
+    showManualTrackEntry();
+    return;
+  }
+  
   previousTrackKey = null;
   currentTrackInfo = null;
   currentRating = null;
@@ -341,6 +511,12 @@ function showNoTrackPlaying() {
 async function fetchCurrentTrack() {
   try {
     const trackInfo = await ipcRenderer.invoke('getCurrentTrack');
+    
+    // Hide manual entry form if it exists and we have track data
+    const manualEntryForm = document.getElementById('manual-track-entry');
+    if (manualEntryForm && trackInfo) {
+      manualEntryForm.style.display = 'none';
+    }
 
     // Обработка случая, когда ничего не играет или данные некорректны
     const normalizedTitle = normalizeTrackField(trackInfo?.title);
@@ -593,7 +769,12 @@ async function fetchCurrentTrack() {
     }
   } catch (error) {
     console.error('Ошибка получения текущего трека:', error);
-    showNoTrackPlaying();
+    // Check if this is a Windows manual entry requirement
+    if (error.message && error.message.includes('MANUAL_ENTRY_REQUIRED')) {
+      showManualTrackEntry();
+    } else {
+      showNoTrackPlaying();
+    }
   }
 }
 
@@ -2020,6 +2201,21 @@ function attachFlagSelectionHandlers(modal, artistName, closeModal) {
 
 // Инициализация
 document.addEventListener('DOMContentLoaded', async () => {
+  // Get platform info first
+  try {
+    platformInfo = await ipcRenderer.invoke('getPlatform');
+    console.log('Platform info:', platformInfo);
+    
+    // Add platform class to body for CSS adjustments
+    if (platformInfo.isWindows) {
+      document.body.classList.add('platform-windows');
+    } else if (platformInfo.isMac) {
+      document.body.classList.add('platform-mac');
+    }
+  } catch (error) {
+    console.error('Error getting platform info:', error);
+  }
+  
   // Verify FlagUtils is loaded
   if (!window.FlagUtils) {
     console.error('FlagUtils not loaded! Check flag-utils.js');
