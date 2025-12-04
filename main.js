@@ -154,13 +154,14 @@ async function findPythonCommand() {
   
   for (const cmd of commands) {
     try {
-      await execPromise(`${cmd} --version`);
+      const version = await execPromise(`${cmd} --version`);
       pythonCommand = cmd;
       pythonChecked = true;
-      console.log(`✅ Found Python: ${cmd}`);
+      console.log(`✅ Found Python: ${cmd} (${version})`);
       return pythonCommand;
-    } catch {
+    } catch (error) {
       // Try next command
+      console.debug(`Python check failed for "${cmd}": ${error.message}`);
     }
   }
   
@@ -177,6 +178,7 @@ async function getWindowsNowPlaying() {
   const python = await findPythonCommand();
   
   if (!python) {
+    console.log('⚠️ Python not available for track detection');
     return null;
   }
   
@@ -203,7 +205,14 @@ async function getWindowsNowPlaying() {
         stderr += data.toString();
       });
       
+      // Timeout after 8 seconds (increased from 5)
+      let timeoutId = setTimeout(() => {
+        proc.kill();
+        reject(new Error('Python script timeout'));
+      }, 8000);
+      
       proc.on('close', (code) => {
+        clearTimeout(timeoutId);
         if (code !== 0 && stderr) {
           reject(new Error(stderr));
         } else {
@@ -212,17 +221,13 @@ async function getWindowsNowPlaying() {
       });
       
       proc.on('error', (err) => {
+        clearTimeout(timeoutId);
         reject(err);
       });
-      
-      // Timeout after 5 seconds
-      setTimeout(() => {
-        proc.kill();
-        reject(new Error('Python script timeout'));
-      }, 5000);
     });
     
     if (!output || output === 'null') {
+      // This is normal - no media is playing
       return null;
     }
     
@@ -240,9 +245,11 @@ async function getWindowsNowPlaying() {
     
     return data;
   } catch (error) {
-    // Don't spam the console with errors - this is checked frequently
-    if (!error.message.includes('No media') && !error.message.includes('null')) {
-      console.debug('Windows now playing error:', error.message);
+    // Log meaningful errors
+    if (error.message.includes('timeout')) {
+      console.warn('⚠️ Python script timed out - media detection may be slow');
+    } else if (!error.message.includes('No media') && !error.message.includes('null')) {
+      console.warn('Windows now playing error:', error.message);
     }
     return null;
   }
