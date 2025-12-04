@@ -2523,6 +2523,61 @@ select {
   margin-top: var(--spacing-sm);
 }
 
+/* ============================================================================
+   FLAG IMAGES (Twemoji for cross-platform support)
+   ============================================================================ */
+
+.flag-twemoji {
+  width: 1.2em;
+  height: 1.2em;
+  vertical-align: -0.15em;
+  object-fit: contain;
+  display: inline-block;
+}
+
+.artist-flag .flag-twemoji,
+.artist-flag-small .flag-twemoji {
+  width: 1.4em;
+  height: 1.4em;
+  vertical-align: -0.2em;
+}
+
+/* Larger flags in top-three cards */
+.top-three-title .flag-twemoji {
+  width: 1.5em;
+  height: 1.5em;
+  vertical-align: -0.25em;
+  margin-right: 0.3em;
+}
+
+/* Flag in selector modal */
+.flag-option .flag-twemoji {
+  width: 2em;
+  height: 2em;
+}
+
+.flag-emoji {
+  font-size: 1.5em;
+}
+
+.flag-emoji-fallback {
+  font-family: "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif;
+}
+
+/* Clickable flag buttons with images */
+.artist-flag-clickable .flag-twemoji,
+.artist-flag-clickable-small .flag-twemoji {
+  width: 1.3em;
+  height: 1.3em;
+}
+
+/* Flag in dropdown items */
+.artist-rating-item .flag-twemoji {
+  width: 1.1em;
+  height: 1.1em;
+  vertical-align: -0.1em;
+}
+
 /* Platform-specific adjustments */
 .platform-windows .navigation {
   /* Add padding for Windows title bar */

@@ -176,6 +176,12 @@ const FlagUtils = window.FlagUtils || {
     const codePoints = code.toUpperCase().split('').map(char => 127397 + char.charCodeAt(0));
     return String.fromCodePoint(...codePoints);
   },
+  getFlagHtml: (code) => {
+    if (!code) return '';
+    const codePoints = code.toUpperCase().split('').map(char => (0x1F1E6 + char.charCodeAt(0) - 65).toString(16));
+    const url = `https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/${codePoints.join('-')}.png`;
+    return `<img src="${url}" alt="${code}" class="flag-twemoji" />`;
+  },
   getCountryName: (code) => code || '',
   searchCountries: () => [],
   getUsedFlagCountries: async () => [],
@@ -184,12 +190,21 @@ const FlagUtils = window.FlagUtils || {
 };
 
 // Create local references to avoid typing FlagUtils. everywhere
+// Use getFlagHtml for cross-platform flag display (Twemoji images)
 const getFlagEmoji = FlagUtils && typeof FlagUtils.getFlagEmoji === 'function' 
   ? FlagUtils.getFlagEmoji.bind(FlagUtils) 
   : (code) => {
       if (!code) return '';
       const codePoints = code.toUpperCase().split('').map(char => 127397 + char.charCodeAt(0));
       return String.fromCodePoint(...codePoints);
+    };
+const getFlagHtml = FlagUtils && typeof FlagUtils.getFlagHtml === 'function'
+  ? FlagUtils.getFlagHtml.bind(FlagUtils)
+  : (code) => {
+      if (!code) return '';
+      const codePoints = code.toUpperCase().split('').map(char => (0x1F1E6 + char.charCodeAt(0) - 65).toString(16));
+      const url = `https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/${codePoints.join('-')}.png`;
+      return `<img src="${url}" alt="${code}" class="flag-twemoji" />`;
     };
 const getCountryName = FlagUtils && typeof FlagUtils.getCountryName === 'function'
   ? FlagUtils.getCountryName.bind(FlagUtils)
@@ -286,9 +301,9 @@ async function updateMultiArtistDisplay(artistElement, artists, artistRatingData
     artistRatingData.map(async (rating) => {
       const color = getRatingColor(rating.avgRating);
       const artistFlag = await ipcRenderer.invoke('getArtistFlag', rating.artist);
-      const flagEmoji = artistFlag ? getFlagEmoji(artistFlag) : '';
+      const flagHtml = artistFlag ? getFlagHtml(artistFlag) : '';
       return `<div class="artist-rating-item">
-        ${flagEmoji ? `<span class="artist-flag-small">${flagEmoji}</span>` : ''}
+        ${flagHtml ? `<span class="artist-flag-small">${flagHtml}</span>` : ''}
         <span class="artist-rating-name">${rating.artist}</span>
         <span class="artist-rating-value" style="color: ${color};">${rating.avgRating.toFixed(1)}</span>
       </div>`;
@@ -568,11 +583,11 @@ async function fetchCurrentTrack() {
       // Get artist flag
       const artistFlag = await ipcRenderer.invoke('getArtistFlag', artists[0]);
       let flagEmoji = '';
-      if (artistFlag && typeof getFlagEmoji === 'function') {
+      if (artistFlag && typeof getFlagHtml === 'function') {
         try {
-          flagEmoji = getFlagEmoji(artistFlag);
+          flagEmoji = getFlagHtml(artistFlag);
         } catch (e) {
-          console.error('Error calling getFlagEmoji:', e);
+          console.error('Error calling getFlagHtml:', e);
         }
       }
       
@@ -665,9 +680,9 @@ async function fetchCurrentTrack() {
           artistRatingData.map(async (rating) => {
             const color = getRatingColor(rating.avgRating);
             const artistFlag = await ipcRenderer.invoke('getArtistFlag', rating.artist);
-            const flagEmoji = artistFlag ? getFlagEmoji(artistFlag) : '';
+            const flagHtml = artistFlag ? getFlagHtml(artistFlag) : '';
             return `<div class="artist-rating-item">
-              ${flagEmoji ? `<span class="artist-flag-small">${flagEmoji}</span>` : ''}
+              ${flagHtml ? `<span class="artist-flag-small">${flagHtml}</span>` : ''}
               <span class="artist-rating-name">${rating.artist}</span>
               <span class="artist-rating-value" style="color: ${color};">${rating.avgRating.toFixed(1)}</span>
             </div>`;
@@ -768,7 +783,10 @@ async function fetchCurrentTrack() {
         });
     }
   } catch (error) {
-    console.error('Ошибка получения текущего трека:', error);
+    // Don't spam console with expected errors on Windows
+    if (!error.message || !error.message.includes('MANUAL_ENTRY_REQUIRED')) {
+      console.error('Ошибка получения текущего трека:', error);
+    }
     // Check if this is a Windows manual entry requirement
     if (error.message && error.message.includes('MANUAL_ENTRY_REQUIRED')) {
       showManualTrackEntry();
@@ -862,11 +880,11 @@ document.querySelectorAll('.rating-button').forEach((button) => {
           // Get artist flag
           const artistFlag = await ipcRenderer.invoke('getArtistFlag', artists[0]);
           let flagEmoji = '';
-          if (artistFlag && typeof getFlagEmoji === 'function') {
+          if (artistFlag && typeof getFlagHtml === 'function') {
             try {
-              flagEmoji = getFlagEmoji(artistFlag);
+              flagEmoji = getFlagHtml(artistFlag);
             } catch (e) {
-              console.error('Error calling getFlagEmoji:', e);
+              console.error('Error calling getFlagHtml:', e);
             }
           }
           
@@ -1393,9 +1411,9 @@ async function createTopThreeCard(item, rank, type, allFlags = {}) {
     `;
   } else if (type === 'artist') {
     const artistFlag = allFlags[item.artist];
-    const flagEmoji = artistFlag ? getFlagEmoji(artistFlag) : '';
-    const flagButton = flagEmoji 
-      ? `<button class="artist-flag-clickable" data-artist="${item.artist}" title="Изменить флаг">${flagEmoji}</button>`
+    const flagHtml = artistFlag ? getFlagHtml(artistFlag) : '';
+    const flagButton = flagHtml 
+      ? `<button class="artist-flag-clickable" data-artist="${item.artist}" title="Изменить флаг">${flagHtml}</button>`
       : `<button class="artist-flag-btn" data-artist="${item.artist}" title="Добавить флаг исполнителя">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
@@ -1606,9 +1624,9 @@ function createRatingsTable(items, startRank, type, allFlags = {}) {
       `;
     } else if (type === 'artist') {
       const artistFlag = allFlags[item.artist];
-      const flagEmoji = artistFlag ? getFlagEmoji(artistFlag) : '';
-      const flagButton = flagEmoji 
-        ? `<button class="artist-flag-clickable-small" data-artist="${item.artist}" title="Изменить флаг">${flagEmoji}</button>`
+      const flagHtml = artistFlag ? getFlagHtml(artistFlag) : '';
+      const flagButton = flagHtml 
+        ? `<button class="artist-flag-clickable-small" data-artist="${item.artist}" title="Изменить флаг">${flagHtml}</button>`
         : `<button class="artist-flag-btn-small" data-artist="${item.artist}" title="Добавить флаг исполнителя">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
@@ -2026,7 +2044,7 @@ async function showFlagSelector(artistName, artistElement) {
         </button>
         ${usedCountries.map(country => `
           <button class="flag-option ${currentFlag === country.code ? 'selected' : ''}" data-code="${country.code}">
-            <span class="flag-emoji">${getFlagEmoji(country.code)}</span>
+            <span class="flag-emoji">${getFlagHtml(country.code)}</span>
             <span class="flag-label">${country.name}</span>
           </button>
         `).join('')}
@@ -2111,13 +2129,13 @@ function showFlagSearchModal(artistName) {
       <div class="flag-selector-grid" id="flag-search-results">
         ${ALL_COUNTRIES.map(country => `
           <button class="flag-option" data-code="${country.code}">
-            <span class="flag-emoji">${getFlagEmoji(country.code)}</span>
+            <span class="flag-emoji">${getFlagHtml(country.code)}</span>
             <span class="flag-label">${country.name}</span>
           </button>
         `).join('')}
         ${Object.keys(CUSTOM_FLAGS).map(code => `
           <button class="flag-option" data-code="${code}">
-            <span class="flag-emoji">${getFlagEmoji(code)}</span>
+            <span class="flag-emoji">${getFlagHtml(code)}</span>
             <span class="flag-label">${getCountryName(code)}</span>
           </button>
         `).join('')}
@@ -2149,13 +2167,13 @@ function showFlagSearchModal(artistName) {
     resultsGrid.innerHTML = [
       ...results.map(country => `
         <button class="flag-option" data-code="${country.code}">
-          <span class="flag-emoji">${getFlagEmoji(country.code)}</span>
+          <span class="flag-emoji">${getFlagHtml(country.code)}</span>
           <span class="flag-label">${country.name}</span>
         </button>
       `),
       ...customResults.map(code => `
         <button class="flag-option" data-code="${code}">
-          <span class="flag-emoji">${getFlagEmoji(code)}</span>
+          <span class="flag-emoji">${getFlagHtml(code)}</span>
           <span class="flag-label">${getCountryName(code)}</span>
         </button>
       `)
