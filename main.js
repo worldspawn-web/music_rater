@@ -810,15 +810,12 @@ class CoverService {
         const existingSize = existingStats.size;
         const newSize = buffer.length;
 
-        // If existing cover is low quality (small file size, typically < 20KB for 150x150)
-        // and we're trying to save a high-quality one, delete the old one
-        if (isHighRes && existingSize < 20000 && newSize > existingSize) {
+        // If we're saving a high-res cover and it's bigger than existing, replace
+        if (isHighRes && newSize > existingSize) {
           console.log(
-            `Deleting low-quality cover (${(existingSize / 1024).toFixed(
+            `Replacing cover with higher quality (${(existingSize / 1024).toFixed(
               2
-            )} KB) and replacing with high-quality (${(newSize / 1024).toFixed(
-              2
-            )} KB)`
+            )} KB → ${(newSize / 1024).toFixed(2)} KB)`
           );
           await fs.unlink(coverPath);
         } else if (!isHighRes && existingSize > 20000) {
@@ -829,12 +826,12 @@ class CoverService {
             ).toFixed(2)} KB)`
           );
           return `${CONSTANTS.PATHS.COVERS}/${filename}`;
-        } else {
+        } else if (newSize <= existingSize) {
           // Same quality or better quality already exists
           console.log(
             `Cover already exists: ${filename} (${(existingSize / 1024).toFixed(
               2
-            )} KB)`
+            )} KB, new would be ${(newSize / 1024).toFixed(2)} KB)`
           );
           return `${CONSTANTS.PATHS.COVERS}/${filename}`;
         }
@@ -1576,6 +1573,8 @@ function registerIpcHandlers() {
         album: albumName,  // Use resolved album name
         coverPath,
       };
+
+      console.log(`📁 Cover path: ${coverPath}, Album: ${albumName}`);
 
       lastTrackCache = {
         key: trackKey,

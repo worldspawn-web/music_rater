@@ -714,7 +714,8 @@ async function fetchCurrentTrack() {
     const background = document.getElementById('dynamic-background');
 
     if (safeTrackInfo.coverPath) {
-      albumCover.src = '../' + safeTrackInfo.coverPath;
+      // Add cache-busting parameter to ensure fresh image loads
+      albumCover.src = '../' + safeTrackInfo.coverPath + '?t=' + Date.now();
       albumCover.style.display = 'block';
       noCover.style.display = 'none';
 
