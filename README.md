@@ -1,4 +1,4 @@
-# 🎵 Yandex Music Rater
+# 🎵 Music Rater
 
 > A tool that allows you to see your real preferences in music.
 
@@ -39,15 +39,15 @@ Will be added later...
 
 ### Download
 
-👉 [**Download Latest Release**](https://github.com/worldspawn-web/yandex_music_rating/releases)
+👉 [**Download Latest Release**](https://github.com/worldspawn-web/music_rating/releases)
 
 
 ### Build from Source
 
 ```bash
 # Clone the repository
-git clone https://github.com/YOUR_USERNAME/yandex_music_rating.git
-cd yandex_music_rating
+git clone https://github.com/YOUR_USERNAME/music_rating.git
+cd music_rating
 
 # Install dependencies
 npm install
@@ -87,7 +87,7 @@ brew install nowplaying-cli
 
 ## 🎯 How It Works
 
-1. **Play music** in Yandex Music (or any music player on macOS)
+1. **Play any music/media** (for example, Yandex Music)
 2. **Open the app** — it automatically detects the current track
 3. **Select a genre** and optionally a mood/vibe
 4. **Rate the track** from 1 to 10
